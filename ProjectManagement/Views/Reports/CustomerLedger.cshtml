@@ -1,0 +1,814 @@
+﻿@* Views/Reports/CustomerLedger.cshtml *@
+@inject ProjectManagement.Services.SiteSettingsService SiteSettings
+@{
+    ViewData["Title"] = "Customer Ledger";
+    var site = SiteSettings.Get();
+    var displayFromDate = ViewBag.FromDate != null ? ((DateTime)ViewBag.FromDate).ToString("yyyy-MM-dd") : DateTime.Today.AddDays(-90).ToString("yyyy-MM-dd");
+    var displayToDate = ViewBag.ToDate != null ? ((DateTime)ViewBag.ToDate).ToString("yyyy-MM-dd") : DateTime.Today.ToString("yyyy-MM-dd");
+
+    Func<ProjectManagement.Models.VoucherType, string> getDisplayType = (vt) => vt switch {
+        ProjectManagement.Models.VoucherType.CCR => "Received",
+        ProjectManagement.Models.VoucherType.BCR => "Purchase",
+        ProjectManagement.Models.VoucherType.AdvancedPayment => "Advance",
+        _ => vt.ToString()
+    };
+}
+
+<div class="d-print-none">
+    <h2><i class="bi bi-person-lines-fill"></i> Customer Ledger Report</h2>
+</div>
+
+@if (ViewBag.Customer == null)
+{
+    <!-- Selection Form -->
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-filter"></i> Select Customer</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Customer <span class="text-danger">*</span></label>
+                    @Html.DropDownList("customerId", ViewBag.Customers as SelectList, "Select Customer", new { @class = "form-select", required = "required" })
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="fromDate" class="form-control" value="@displayFromDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="toDate" class="form-control" value="@displayToDate" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Generate Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    var customer = ViewBag.Customer as ProjectManagement.Models.Customer;
+    var openingBalance = (decimal)ViewBag.OpeningBalance;
+    var totalDebit = (decimal)ViewBag.TotalDebit;
+    var totalCredit = (decimal)ViewBag.TotalCredit;
+    var closingBalance = (decimal)ViewBag.ClosingBalance;
+    var vouchers = ViewBag.Vouchers as List<ProjectManagement.Models.Voucher>;
+    var fromDate = (DateTime)ViewBag.FromDate;
+    var toDate = (DateTime)ViewBag.ToDate;
+    var advancedBalance = (decimal)(ViewBag.AdvancedBalance ?? 0m);
+
+    <!-- Filter Form -->
+    <div class="card mb-3 d-print-none">
+        <div class="card-header bg-primary text-white">
+            <h6 class="mb-0"><i class="bi bi-funnel"></i> Filter Options</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Customer</label>
+                    @Html.DropDownList("customerId", ViewBag.Customers as SelectList, "Select Customer", new { @class = "form-select" })
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">From Date</label>
+                    <input type="date" name="fromDate" value="@fromDate.ToString("yyyy-MM-dd")" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">To Date</label>
+                    <input type="date" name="toDate" value="@toDate.ToString("yyyy-MM-dd")" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">Item</label>
+                    @Html.DropDownList("itemId", ViewBag.Items as SelectList, "-- All Items --", new { @class = "form-select" })
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">Voucher Type</label>
+                    <select name="voucherType" class="form-select">
+                        <option value="">-- All Types --</option>
+                        <option value="Purchase" selected="@(ViewBag.SelectedVoucherType == "Purchase")">Purchase</option>
+                        <option value="Sale" selected="@(ViewBag.SelectedVoucherType == "Sale")">Sale</option>
+                        <option value="CashPaid" selected="@(ViewBag.SelectedVoucherType == "CashPaid")">Cash Paid</option>
+                        <option value="CashReceived" selected="@(ViewBag.SelectedVoucherType == "CashReceived")">Cash Received</option>
+                        <option value="CCR" selected="@(ViewBag.SelectedVoucherType == "CCR")">Received (CCR)</option>
+                        <option value="AdvancedPayment" selected="@(ViewBag.SelectedVoucherType == "AdvancedPayment")">Advanced Payment</option>
+                        <option value="Expense" selected="@(ViewBag.SelectedVoucherType == "Expense")">Expense</option>
+                        <option value="Hazri" selected="@(ViewBag.SelectedVoucherType == "Hazri")">Hazri</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Customer Name Banner -->
+    <div class="card mb-3 shadow-sm border-0" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
+        <div class="card-body py-3 px-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-white d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:56px; height:56px;">
+                    <i class="bi bi-person-fill text-primary" style="font-size:1.8rem;"></i>
+                </div>
+                <div>
+                    <h3 class="text-white fw-bold mb-0">@customer.Name</h3>
+                    <small class="text-white opacity-75">
+                        @if (!string.IsNullOrEmpty(customer.Phone)) { <span><i class="bi bi-telephone me-1"></i>@customer.Phone</span> }
+                        @if (!string.IsNullOrEmpty(customer.Address)) { <span class="ms-3"><i class="bi bi-geo-alt me-1"></i>@customer.Address</span> }
+                    </small>
+                </div>
+                <div class="ms-auto text-white text-end opacity-75">
+                    <small><i class="bi bi-calendar-range me-1"></i>@fromDate.ToString("dd-MMM-yyyy") to @toDate.ToString("dd-MMM-yyyy")</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Balance Cards -->
+    <div class="row g-3 mb-3">
+        <!-- Opening Balance -->
+        <div class="col-md-4">
+            <div class="card border-success shadow-sm h-100">
+                <div class="card-body bg-light text-center">
+                    <h6 class="text-muted mb-2 fw-bold">
+                        <i class="bi bi-arrow-up-circle"></i> Opening Balance
+                    </h6>
+                    <h3 class="balance-amount @(openingBalance >= 0 ? "text-success" : "text-danger") mb-0">
+                        @(openingBalance < 0 ? "-" : "")Rs. @string.Format("{0:N0}", Math.Abs(openingBalance))
+                    </h3>
+                    <span class="badge bg-@(openingBalance >= 0 ? "success" : "danger") mt-2">
+                        @(openingBalance >= 0 ? "Debit" : "Credit")
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Payment Balance Card -->
+        @{
+            var advancedReportUrl = Url.Action("AdvancedPaymentReport", "Reports", new {
+                customerId = customer.Id,
+                fromDate = fromDate.ToString("yyyy-MM-dd"),
+                toDate = toDate.ToString("yyyy-MM-dd")
+            });
+        }
+        <div class="col-md-4">
+            <a href="@advancedReportUrl" class="text-decoration-none">
+                <div class="card border-warning shadow-sm h-100" style="cursor:pointer; transition: transform 0.15s, box-shadow 0.15s;"
+                     onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 16px rgba(255,193,7,0.4)'"
+                     onmouseout="this.style.transform='';this.style.boxShadow=''">
+                    <div class="card-body bg-light text-center">
+                        <h6 class="text-muted mb-2 fw-bold">
+                            <i class="bi bi-cash-coin"></i> Advanced Balance
+                        </h6>
+                        <h3 class="balance-amount @(advancedBalance >= 0 ? "text-success" : "text-danger") mb-0">
+                            @(advancedBalance < 0 ? "-" : "+")Rs. @string.Format("{0:N0}", Math.Abs(advancedBalance))
+                        </h3>
+                        <span class="badge bg-warning text-dark mt-2">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>
+                            @(advancedBalance >= 0 ? "Holding Customer Advance" : "We Owe Customer")
+                        </span>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Closing Balance -->
+        <div class="col-md-4">
+            <div class="card border-primary shadow-sm h-100">
+                <div class="card-body bg-light text-center">
+                    <h6 class="text-muted mb-2 fw-bold">
+                        <i class="bi bi-wallet2"></i> Closing Balance
+                    </h6>
+                    <h3 class="balance-amount @(closingBalance >= 0 ? "text-success" : "text-danger") mb-0">
+                        @(closingBalance < 0 ? "-" : "")Rs. @string.Format("{0:N0}", Math.Abs(closingBalance))
+                    </h3>
+                    <span class="badge bg-@(closingBalance >= 0 ? "success" : "danger") mt-2">
+                        @(closingBalance >= 0 ? "Debit" : "Credit")
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ledger Transactions -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
+            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Transaction Details</h5>
+            <div class="input-group input-group-sm d-print-none" style="max-width:260px;">
+                <span class="input-group-text bg-secondary border-0 text-white"><i class="bi bi-search"></i></span>
+                <input type="text" id="ledgerSearch" class="form-control border-0" placeholder="Search all columns..." />
+                <button class="btn btn-secondary btn-sm" id="ledgerSearchClear" title="Clear"><i class="bi bi-x"></i></button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered mb-0" id="ledgerTable">
+                    <thead class="table-primary">
+                        <tr>
+                            <th class="fw-bold" style="font-size: 14px;">Date</th>
+                            <th class="fw-bold" style="font-size: 14px;">Transaction No.</th>
+                            <th class="fw-bold" style="font-size: 14px;">Type</th>
+                            <th class="fw-bold" style="font-size: 14px;">Items</th>
+                            <th class="fw-bold" style="font-size: 14px;">Gari No</th>
+                            <th class="fw-bold" style="font-size: 14px;">Description</th>
+                            <th class="text-end fw-bold" style="font-size: 14px;">Weight</th>
+                            <th class="text-end fw-bold" style="font-size: 14px;">Kat</th>
+                            <th class="text-end fw-bold" style="font-size: 14px;">Net Weight</th>
+                            <th class="text-end fw-bold" style="font-size: 14px;">Rate</th>
+                            <th class="text-end fw-bold" style="font-size: 14px;">Debit (Dr)</th>
+                            <th class="text-end fw-bold" style="font-size: 14px;">Credit (Cr)</th>
+                            <th class="text-end fw-bold" style="font-size: 14px;">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Opening Balance Row -->
+                        <tr class="table-warning">
+                            <td class="fw-semibold">@fromDate.ToString("dd-MMM-yyyy")</td>
+                            <td colspan="9" class="fw-bold fs-6">Opening Balance</td>
+                            <td class="text-end fw-semibold">@(openingBalance > 0 ? string.Format("{0:N0}", openingBalance) : "-")</td>
+                            <td class="text-end fw-semibold">@(openingBalance < 0 ? string.Format("{0:N0}", Math.Abs(openingBalance)) : "-")</td>
+                            <td class="text-end fw-bold">
+                                @string.Format("{0:N0}", Math.Abs(openingBalance)) @(openingBalance >= 0 ? "Dr" : "Cr")
+                            </td>
+                        </tr>
+
+                        @if (vouchers != null && vouchers.Any())
+                        {
+                            decimal runningBalance = openingBalance;
+                            foreach (var voucher in vouchers)
+                            {
+                                decimal debit = 0;
+                                decimal credit = 0;
+                                string itemName = "";
+                                string description = "";
+
+                                // Determine debit/credit based on voucher type and customer role
+                                // Purchase = CR (we owe the supplier/customer)
+                                // Sale = DR (customer owes us)
+                                // CashPaid = DR (we paid the customer, reduces what we owe)
+                                // CashReceived = CR (customer paid us, reduces what they owe)
+                                if (voucher.PurchasingCustomerId == customer.Id)
+                                {
+                                    switch (voucher.VoucherType)
+                                    {
+                                        case ProjectManagement.Models.VoucherType.Purchase:
+                                            credit = voucher.Amount;  // Purchase = CR (we owe them)
+                                            itemName = voucher.Item?.Name ?? "N/A";
+                                            description = voucher.PurchasingCustomerDetails;
+                                            break;
+                                        case ProjectManagement.Models.VoucherType.CashPaid:
+                                            debit = voucher.Amount;   // Cash Paid = DR (reduces what we owe)
+                                            itemName = "Cash Paid";
+                                            description = voucher.PurchasingCustomerDetails;
+                                            break;
+                                        case ProjectManagement.Models.VoucherType.CCR:
+                                            debit = voucher.Amount;   // CCR transfer out = DR
+                                            itemName = voucher.ReceivingCustomerId.HasValue
+                                                ? $"Paid to <a href='/Reports/CustomerLedger?customerId={voucher.ReceivingCustomerId}&fromDate={fromDate:yyyy-MM-dd}&toDate={toDate:yyyy-MM-dd}'>{voucher.ReceivingCustomer?.Name ?? "N/A"}</a>"
+                                                : $"Paid to {voucher.ReceivingCustomer?.Name ?? "N/A"}";
+                                            description = voucher.PurchasingCustomerDetails;
+                                            break;
+                                    }
+                                }
+
+                                if (voucher.ReceivingCustomerId == customer.Id)
+                                {
+                                    switch (voucher.VoucherType)
+                                    {
+                                        case ProjectManagement.Models.VoucherType.Sale:
+                                            debit = voucher.Amount;   // Sale = DR (they owe us)
+                                            itemName = voucher.Item?.Name ?? "N/A";
+                                            description = voucher.ReceivingCustomerDetails;
+                                            break;
+                                        case ProjectManagement.Models.VoucherType.CashReceived:
+                                            credit = voucher.Amount;  // Cash Received = CR (reduces what they owe)
+                                            itemName = "Cash Received";
+                                            description = voucher.ReceivingCustomerDetails;
+                                            break;
+                                        case ProjectManagement.Models.VoucherType.CCR:
+                                            credit = voucher.Amount;  // CCR transfer in = CR
+                                            itemName = voucher.PurchasingCustomerId.HasValue
+                                                ? $"Received from <a href='/Reports/CustomerLedger?customerId={voucher.PurchasingCustomerId}&fromDate={fromDate:yyyy-MM-dd}&toDate={toDate:yyyy-MM-dd}'>{voucher.PurchasingCustomer?.Name ?? "N/A"}</a>"
+                                                : $"Received from {voucher.PurchasingCustomer?.Name ?? "N/A"}";
+                                            description = voucher.ReceivingCustomerDetails;
+                                            break;
+                                        case ProjectManagement.Models.VoucherType.AdvancedPayment:
+                                            credit = voucher.Amount;  // Advance = CR (customer paid ahead)
+                                            itemName = "Advanced Payment";
+                                            description = voucher.ReceivingCustomerDetails;
+                                            break;
+                                    }
+                                }
+
+                                runningBalance += debit - credit;
+
+                                <tr style="font-size: 13px;">
+                                    <td class="align-middle">@voucher.VoucherDate.ToPkDate()</td>
+                                    <td class="align-middle">@voucher.TransactionNumber</td>
+                                    <td class="align-middle">
+                                        <span class="badge bg-@(voucher.VoucherType == ProjectManagement.Models.VoucherType.Purchase ? "primary" :
+                                                              voucher.VoucherType == ProjectManagement.Models.VoucherType.Sale ? "success" :
+                                                              voucher.VoucherType == ProjectManagement.Models.VoucherType.CashPaid ? "warning text-dark" :
+                                                              voucher.VoucherType == ProjectManagement.Models.VoucherType.CashReceived ? "info" :
+                                                              voucher.VoucherType == ProjectManagement.Models.VoucherType.AdvancedPayment ? "success" : "secondary")" style="font-size: 11px;">
+                                            @getDisplayType(voucher.VoucherType)
+                                        </span>
+                                    </td>
+                                    <td class="align-middle">@Html.Raw(itemName)</td>
+                                    <td class="align-middle">@(voucher.GariNo ?? "-")</td>
+                                    <td class="align-middle">@description</td>
+                                    <td class="text-end align-middle">@(voucher.Weight.HasValue ? voucher.Weight.Value.ToString("#,##0.###") : "-")</td>
+                                    <td class="text-end align-middle">@(voucher.Kat.HasValue ? voucher.Kat.Value.ToString("#,##0.###") : "-")</td>
+                                    <td class="text-end align-middle">@(voucher.Quantity.HasValue ? voucher.Quantity.Value.ToString("#,##0.###") : "-")</td>
+                                    <td class="text-end align-middle">@(voucher.Rate.HasValue ? voucher.Rate.Value.ToString("#,##0.##") : "-")</td>
+                                    <td class="text-end align-middle @(debit > 0 ? "text-success fw-semibold" : "")">@(debit > 0 ? string.Format("{0:N0}", debit) : "-")</td>
+                                    <td class="text-end align-middle @(credit > 0 ? "text-danger fw-semibold" : "")">@(credit > 0 ? string.Format("{0:N0}", credit) : "-")</td>
+                                    <td class="text-end align-middle fw-bold @(runningBalance >= 0 ? "text-success" : "text-danger")">
+                                        @(runningBalance < 0 ? "-" : "")@string.Format("{0:N0}", Math.Abs(runningBalance)) @(runningBalance >= 0 ? "Dr" : "Cr")
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="13" class="text-center text-muted py-4 fst-italic">
+                                    <i class="bi bi-info-circle"></i> No transactions found for the selected filters.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-success">
+                        <tr style="font-size: 15px;">
+                            <th colspan="10" class="text-end fw-bold py-3">TOTAL:</th>
+                            <th class="text-end text-success fw-bold py-3">Rs. @string.Format("{0:N0}", totalDebit)</th>
+                            <th class="text-end text-danger fw-bold py-3">Rs. @string.Format("{0:N0}", totalCredit)</th>
+                            <th class="text-end fw-bold py-3 @(closingBalance >= 0 ? "text-success" : "text-danger")">
+                                @(closingBalance < 0 ? "-" : "")Rs. @string.Format("{0:N0}", Math.Abs(closingBalance)) @(closingBalance >= 0 ? "Dr" : "Cr")
+                            </th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="mt-3 d-print-none btn-group-mobile">
+        <a asp-controller="Vouchers" asp-action="AdvancedCashReceived" class="btn btn-success">
+            <i class="bi bi-cash-coin"></i> Record Advance Received
+        </a>
+        <a asp-controller="Vouchers" asp-action="AdvancedCashPaid" class="btn btn-danger">
+            <i class="bi bi-cash-stack"></i> Record Advance Paid
+        </a>
+        <button onclick="window.print()" class="btn btn-primary">
+            <i class="bi bi-printer"></i> Print Ledger
+        </button>
+        <button onclick="exportTableToExcel('ledgerTable', 'CustomerLedger_@customer.Name.Replace(" ", "_")_@DateTime.Now.ToString("yyyyMMdd")')" class="btn btn-success">
+            <i class="bi bi-file-earmark-excel"></i> Export to Excel
+        </button>
+        <button onclick="generatePDF()" class="btn btn-danger"
+                data-customer-name="@customer.Name">
+            <i class="bi bi-file-pdf"></i> Generate PDF
+        </button>
+        <button onclick="sendToWhatsApp()" class="btn btn-success" style="background-color: #25D366; border-color: #25D366;"
+                data-customer-name="@customer.Name"
+                data-customer-phone="@customer.Phone"
+                data-from-date="@fromDate.ToString("dd-MMM-yyyy")"
+                data-to-date="@toDate.ToString("dd-MMM-yyyy")"
+                data-closing-balance="@string.Format("{0:N0}", Math.Abs(closingBalance))"
+                data-balance-type="@(closingBalance >= 0 ? "Dr" : "Cr")">
+            <i class="bi bi-whatsapp"></i> Send to WhatsApp
+        </button>
+        <a asp-controller="Reports" asp-action="ExportToExcel" asp-route-reportType="customerLedger"
+           asp-route-id="@customer.Id" asp-route-fromDate="@fromDate" asp-route-toDate="@toDate"
+           asp-route-itemId="@ViewBag.SelectedItemId" asp-route-voucherType="@ViewBag.SelectedVoucherType" class="btn btn-warning">
+            <i class="bi bi-download"></i> Download Full Report
+        </a>
+        <a asp-action="CustomerLedger" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> New Customer
+        </a>
+        <a asp-action="Index" class="btn btn-secondary">
+            <i class="bi bi-house"></i> Back to Reports
+        </a>
+    </div>
+}
+
+@section Scripts {
+    <!-- html2pdf.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var $rows = $('#ledgerTable tbody tr:not(.table-warning)');
+
+            $('#ledgerSearch').on('input', function() {
+                var term = $(this).val().toLowerCase().trim();
+                if (!term) {
+                    $rows.show();
+                    return;
+                }
+                $rows.each(function() {
+                    var rowText = $(this).text().toLowerCase();
+                    $(this).toggle(rowText.indexOf(term) !== -1);
+                });
+            });
+
+            $('#ledgerSearchClear').on('click', function() {
+                $('#ledgerSearch').val('').trigger('input').focus();
+            });
+        });
+
+        // Site branding for the PDF footer (set in Theme Settings, saved to sitesettings.json)
+        var SITE = {
+            name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.SiteName)),
+            showDev: @(site.ShowDeveloperInfo ? "true" : "false"),
+            devName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.DeveloperName)),
+            devContact: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.DeveloperContact))
+        };
+
+        // Builds the site-name + (optional) developer footer block appended to the
+        // bottom of the cloned report so it appears in the generated PDF.
+        function buildSiteFooter() {
+            var wrap = document.createElement('div');
+            wrap.style.cssText = 'margin-top:14px;padding-top:8px;border-top:1px solid #999;text-align:center;font-family:Arial,sans-serif;';
+
+            var line1 = document.createElement('div');
+            line1.style.cssText = 'font-size:11px;color:#333;font-weight:600;';
+            line1.textContent = 'This report was generated by ' + SITE.name + ' Management System';
+            wrap.appendChild(line1);
+
+            if (SITE.showDev) {
+                var line2 = document.createElement('div');
+                line2.style.cssText = 'font-size:10px;color:#666;margin-top:3px;';
+                line2.textContent = 'Software developed by ' + SITE.devName + ' - Contact: ' + SITE.devContact + ' for the management software';
+                wrap.appendChild(line2);
+            }
+            return wrap;
+        }
+
+        function generatePDF() {
+            // Show loading indicator
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating PDF...';
+            button.disabled = true;
+
+            // Get customer name from data attribute
+            const customerName = button.getAttribute('data-customer-name') || 'Customer';
+            const timestamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
+            const filename = 'CustomerLedger_' + customerName.replace(/\s+/g, '_') + '_' + timestamp + '.pdf';
+
+            // Build a clean clone of just the report (no navbar/footer/buttons),
+            // expanded so every row and every column is rendered.
+            const element = buildPdfElement();
+
+            // Configure PDF options â€” landscape so all 13 columns fit the page width
+            const opt = {
+                margin: [10, 10, 10, 10],
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    scrollY: 0,
+                    scrollX: 0,
+                    windowHeight: element.scrollHeight
+                },
+                jsPDF: {
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: 'landscape'
+                },
+                // Let the table flow across pages; break only between rows, never inside one
+                pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' }
+            };
+
+            // Generate PDF and download
+            html2pdf().set(opt).from(element).save().then(function() {
+                // Reset button
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }).catch(function(error) {
+                console.error('PDF generation error:', error);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+
+        // Builds a clean clone of just the report content (no navbar/footer/buttons),
+        // expanded so html2pdf captures every row and every column.
+        function buildPdfElement() {
+            const element = document.querySelector('body').cloneNode(true);
+
+            // Body uses flex column layout for sticky footer â€” neutralize it on the
+            // clone so the report content flows normally for capture.
+            element.style.display = 'block';
+            element.style.height = 'auto';
+
+            // Strip the site chrome: top navbar, page footer, modals, and any
+            // screen-only controls (filter form, search box, action buttons).
+            element.querySelectorAll('header, footer, .modal, .d-print-none')
+                   .forEach(el => el.remove());
+
+            // Remove the scrollable/fixed-height container so the full table renders.
+            element.querySelectorAll('.table-responsive').forEach(function(el) {
+                el.style.maxHeight = 'none';
+                el.style.overflow = 'visible';
+                el.style.overflowX = 'visible';
+                el.style.overflowY = 'visible';
+            });
+
+            // Sticky headers confuse html2canvas page splitting â€” make them static
+            // and ensure the header repeats on every page via table-header-group.
+            element.querySelectorAll('#ledgerTable thead').forEach(function(thead) {
+                thead.style.display = 'table-header-group';
+            });
+            element.querySelectorAll('#ledgerTable thead th').forEach(function(th) {
+                th.style.position = 'static';
+            });
+            element.querySelectorAll('#ledgerTable tfoot').forEach(function(tfoot) {
+                tfoot.style.display = 'table-footer-group';
+            });
+
+            // Force the table to fit the page width so no columns are clipped, and
+            // assign proportional column widths so badges/numbers don't overlap.
+            // Column order: Date, Txn No, Type, Items, Gari No, Description,
+            // Weight, Kat, Net Weight, Rate, Debit, Credit, Balance.
+            const colWidths = ['7%', '7%', '8%', '10%', '6%', '10%', '5%', '4%', '5%', '4%', '10%', '10%', '14%'];
+            element.querySelectorAll('#ledgerTable').forEach(function(tbl) {
+                tbl.style.width = '100%';
+                tbl.style.tableLayout = 'fixed';
+
+                // Inject a colgroup so every page uses the same column proportions.
+                const existing = tbl.querySelector('colgroup');
+                if (existing) existing.remove();
+                const colgroup = document.createElement('colgroup');
+                colWidths.forEach(function(w) {
+                    const col = document.createElement('col');
+                    col.style.width = w;
+                    colgroup.appendChild(col);
+                });
+                tbl.insertBefore(colgroup, tbl.firstChild);
+            });
+
+            element.querySelectorAll('#ledgerTable th, #ledgerTable td').forEach(function(cell) {
+                cell.style.wordBreak = 'break-word';
+                cell.style.whiteSpace = 'normal';
+                cell.style.overflowWrap = 'anywhere';
+                cell.style.fontSize = '11px';
+                cell.style.padding = '4px 5px';
+                cell.style.verticalAlign = 'middle';
+            });
+
+            // Keep type badges on a single line inside their cell so they don't
+            // overflow into the adjacent Items column.
+            element.querySelectorAll('#ledgerTable .badge').forEach(function(badge) {
+                badge.style.whiteSpace = 'nowrap';
+                badge.style.display = 'inline-block';
+                badge.style.maxWidth = '100%';
+                badge.style.fontSize = '9px';
+                badge.style.overflow = 'hidden';
+                badge.style.textOverflow = 'ellipsis';
+            });
+
+            // Footer TOTAL cells: keep each amount on one line and right-aligned so
+            // the three totals don't run into each other.
+            element.querySelectorAll('#ledgerTable tfoot th').forEach(function(cell) {
+                cell.style.fontSize = '11px';
+                cell.style.whiteSpace = 'nowrap';
+                cell.style.wordBreak = 'normal';
+                cell.style.overflowWrap = 'normal';
+                cell.style.padding = '6px 5px';
+            });
+
+            // Append the site / developer footer at the bottom of the report.
+            var main = element.querySelector('main') || element.querySelector('.container-fluid') || element;
+            main.appendChild(buildSiteFooter());
+
+            return element;
+        }
+
+        async function sendToWhatsApp() {
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating PDF...';
+            button.disabled = true;
+
+            const customerName = button.getAttribute('data-customer-name') || 'Customer';
+            const customerPhone = button.getAttribute('data-customer-phone') || '';
+            const fromDate = button.getAttribute('data-from-date') || '';
+            const toDate = button.getAttribute('data-to-date') || '';
+            const closingBalance = button.getAttribute('data-closing-balance') || '0';
+            const balanceType = button.getAttribute('data-balance-type') || 'Dr';
+
+            const now = new Date();
+            const timestamp = now.getFullYear().toString() +
+                String(now.getMonth()+1).padStart(2,'0') +
+                String(now.getDate()).padStart(2,'0') + '-' +
+                String(now.getHours()).padStart(2,'0') +
+                String(now.getMinutes()).padStart(2,'0') +
+                String(now.getSeconds()).padStart(2,'0');
+            const filename = timestamp + '-CustomerLedger_' + customerName.replace(/\s+/g, '_') + '.pdf';
+
+            try {
+                const element = buildPdfElement();
+
+                const opt = {
+                    margin: [10, 10, 10, 10],
+                    filename: filename,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0, windowHeight: element.scrollHeight },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                    pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' }
+                };
+
+                // Step 1: Generate PDF blob
+                const pdf = await html2pdf().set(opt).from(element).toPdf().get('pdf');
+                const pdfBlob = pdf.output('blob');
+
+                // Step 2: Auto-download the PDF to user's device
+                const downloadUrl = URL.createObjectURL(pdfBlob);
+                const downloadLink = document.createElement('a');
+                downloadLink.href = downloadUrl;
+                downloadLink.download = filename;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                setTimeout(() => URL.revokeObjectURL(downloadUrl), 3000);
+
+                // Step 3: Build WhatsApp message
+                const message = `*Customer Ledger Report*\n` +
+                                `â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n` +
+                                `Customer: ${customerName}\n` +
+                                `Period: ${fromDate} to ${toDate}\n` +
+                                `Closing Balance: Rs. ${closingBalance} ${balanceType}\n\n` +
+                                `PDF has been downloaded on your device.\n` +
+                                `Please attach the file named:\n${filename}`;
+
+                // Step 4: Format phone number with Pakistan code
+                let phone = customerPhone.replace(/\D/g, '');
+                if (phone.startsWith('0')) phone = '92' + phone.substring(1);
+                else if (!phone.startsWith('92')) phone = '92' + phone;
+
+                const encodedMessage = encodeURIComponent(message);
+
+                // Step 5: Detect mobile vs desktop and open correct WhatsApp
+                const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+                let whatsappUrl;
+                if (isMobile) {
+                    // Mobile: open WhatsApp app directly
+                    whatsappUrl = phone
+                        ? `whatsapp://send?phone=${phone}&text=${encodedMessage}`
+                        : `whatsapp://send?text=${encodedMessage}`;
+                } else {
+                    // Desktop: open WhatsApp Web
+                    whatsappUrl = phone
+                        ? `https://web.whatsapp.com/send?phone=${phone}&text=${encodedMessage}`
+                        : `https://web.whatsapp.com/send?text=${encodedMessage}`;
+                }
+
+                button.innerHTML = originalText;
+                button.disabled = false;
+
+                // Step 6: Small delay so PDF download starts first, then open WhatsApp
+                setTimeout(() => {
+                    if (isMobile) {
+                        window.location.href = whatsappUrl;
+                    } else {
+                        window.open(whatsappUrl, '_blank');
+                    }
+                }, 1500);
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error generating PDF: ' + error.message);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        function exportTableToExcel(tableID, filename = ''){
+            var downloadLink;
+            var dataType = 'application/vnd.ms-excel';
+            var tableSelect = document.getElementById(tableID);
+            var tableHTML = tableSelect.outerHTML.replace(/ /g, '%20');
+
+            filename = filename?filename+'.xls':'excel_data.xls';
+            downloadLink = document.createElement("a");
+            document.body.appendChild(downloadLink);
+
+            if(navigator.msSaveOrOpenBlob){
+                var blob = new Blob(['\ufeff', tableHTML], {
+                    type: dataType
+                });
+                navigator.msSaveOrOpenBlob( blob, filename);
+            }else{
+                downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
+                downloadLink.download = filename;
+                downloadLink.click();
+            }
+        }
+    </script>
+
+    <style>
+        /* Enhanced table styling */
+        #ledgerTable thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #cfe2ff !important;
+            border-bottom: 2px solid #0d6efd;
+            padding: 12px 8px;
+        }
+
+        #ledgerTable tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        #ledgerTable {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .card-header {
+            font-size: 1.1rem;
+            padding: 15px 20px;
+        }
+
+        /* On-screen: keep a fixed-height scroll container so very large ledgers
+           render fast and never hang the page. The PDF export expands its own
+           clone (see buildPdfElement), so it still captures every row/column. */
+        .table-responsive {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        /* Custom scrollbar */
+        .table-responsive::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Balance amount styling */
+        .balance-amount {
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        @@media print {
+            .table {
+                font-size: 9pt;
+            }
+
+            .badge {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .table-responsive {
+                max-height: none;
+                overflow: visible;
+            }
+
+            #ledgerTable thead th {
+                position: static;
+            }
+
+            /* Repeat the table header on every printed page */
+            #ledgerTable thead {
+                display: table-header-group;
+            }
+
+            #ledgerTable tfoot {
+                display: table-footer-group;
+            }
+
+            /* Never split a row across a page boundary */
+            #ledgerTable tr {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+}
+

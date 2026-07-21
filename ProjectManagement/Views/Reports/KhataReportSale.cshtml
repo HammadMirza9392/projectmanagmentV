@@ -1,0 +1,633 @@
+﻿@* Views/Reports/KhataReportSale.cshtml - Urdu Khata Detail Report (SALE side) *@
+@inject ProjectManagement.Services.SiteSettingsService SiteSettings
+@{
+    ViewData["Title"] = "Ú©Ú¾Ø§ØªØ§ ÙØ±ÙˆØ®Øª";
+    var site = SiteSettings.Get();
+    var defaultFromDate = ViewBag.FromDate != null ? ((DateTime)ViewBag.FromDate).ToString("yyyy-MM-dd") : DateTime.Now.AddMonths(-1).ToString("yyyy-MM-dd");
+    var defaultToDate = ViewBag.ToDate != null ? ((DateTime)ViewBag.ToDate).ToString("yyyy-MM-dd") : DateTime.Now.ToString("yyyy-MM-dd");
+}
+
+@section Styles {
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    /* Urdu RTL font & layout */
+    body { direction: ltr; }
+    .khata-page {
+        font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Traditional Arabic', Arial, sans-serif;
+        direction: rtl;
+        max-width: 900px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 10px;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+    .khata-header-bar {
+        background: #1a1a2e;
+        color: #fff;
+        padding: 6px 14px;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        direction: ltr;
+    }
+    .khata-title-block {
+        text-align: center;
+        border: 2px solid #333;
+        padding: 6px 0;
+        margin: 6px 0;
+    }
+    .khata-title-block h2 {
+        font-size: 22px;
+        font-weight: bold;
+        margin: 0 0 2px 0;
+        color: #000;
+    }
+    .khata-title-block h3 {
+        font-size: 16px;
+        margin: 0;
+        color: #000;
+    }
+    .khata-info-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 6px;
+    }
+    .khata-info-table td {
+        padding: 2px 8px;
+        font-size: 12px;
+        vertical-align: top;
+    }
+    .khata-info-table .label { font-weight: bold; }
+    .khata-section-header {
+        background: #f0f0f0;
+        font-weight: bold;
+        text-align: center;
+        padding: 8px 4px;
+        border: 1px solid #ccc;
+        font-size: 13px;
+        margin-top: 6px;
+    }
+    .khata-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        direction: rtl;
+    }
+    .khata-table th {
+        background: #ddd;
+        border: 1px solid #999;
+        padding: 7px 10px;
+        text-align: center;
+        font-weight: bold;
+        white-space: nowrap;
+        line-height: 1.8;
+    }
+    .khata-table td {
+        border: 1px solid #bbb;
+        padding: 6px 10px;
+        text-align: center;
+        white-space: nowrap;
+        line-height: 1.8;
+    }
+    .khata-table td.text-right { text-align: right; }
+    .khata-table td.text-left { text-align: left; }
+    /* Detail columns: wrap long text onto a second line instead of widening
+       the column. Caps the width and breaks long words so the table stays fixed. */
+    .khata-table th.detail-col,
+    .khata-table td.detail-col {
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        max-width: 180px;
+        min-width: 120px;
+    }
+    .khata-table tr.total-row td {
+        background: #f5f5f5;
+        font-weight: bold;
+        border-top: 2px solid #555;
+    }
+    .khata-table tr.opening-row td {
+        background: #fffde7;
+        font-style: italic;
+    }
+    .balance-box {
+        border: 2px solid #333;
+        padding: 6px 12px;
+        margin-top: 8px;
+        background: #f9f9f9;
+        direction: rtl;
+    }
+    .balance-box table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    .balance-box table td { padding: 3px 8px; }
+    .balance-box .bal-label { font-weight: bold; text-align: right; }
+    .balance-box .bal-value { text-align: left; font-weight: bold; }
+    .balance-final {
+        background: #1a1a2e;
+        color: #fff;
+        font-size: 14px;
+        font-weight: bold;
+        padding: 5px 12px;
+        display: flex;
+        justify-content: space-between;
+        margin-top: 4px;
+    }
+    .net-balance-box {
+        border: 3px solid #1a1a2e;
+        background: #fff;
+        padding: 5px 16px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        font-weight: bold;
+        margin-top: 6px;
+        direction: rtl;
+    }
+    .date-range-header {
+        text-align: center;
+        font-weight: bold;
+        font-size: 13px;
+        border: 1px solid #ccc;
+        padding: 3px;
+        background: #fafafa;
+        direction: ltr;
+    }
+    .khata-table tr {
+        page-break-inside: avoid;
+    }
+    .balance-box, .net-balance-box {
+        page-break-inside: avoid;
+    }
+    .khata-section-header {
+        page-break-after: avoid;
+    }
+    @@media print {
+        .d-print-none { display: none !important; }
+        .khata-page { padding: 0; }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .khata-table tr { page-break-inside: avoid; }
+        .balance-box, .net-balance-box { page-break-inside: avoid; }
+    }
+</style>
+}
+
+<div class="d-print-none mb-3">
+    <h4><i class="bi bi-journal-text"></i> Ú©Ú¾Ø§ØªØ§ ÙØ±ÙˆØ®Øª (Urdu Khata Report - Sale)</h4>
+</div>
+
+@if (ViewBag.Customer == null)
+{
+    <!-- Selection Form -->
+    <div class="card">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">Ú©Ú¾Ø§ØªØ§ ÙØ±ÙˆØ®Øª - Ú©Ø³Ù¹Ù…Ø± Ù…Ù†ØªØ®Ø¨ Ú©Ø±ÛŒÚº</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Ú©Ø³Ù¹Ù…Ø± (Customer) <span class="text-danger">*</span></label>
+                    @Html.DropDownList("customerId", ViewBag.Customers as SelectList, "Select Customer", new { @class = "form-select select2-customer", required = "required" })
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">From Date (Ø§Ø³ ØªØ§Ø±ÛŒØ® Ø³Û’)</label>
+                    <input type="date" name="fromDate" class="form-control" value="@defaultFromDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">To Date (Ø§Ø³ ØªØ§Ø±ÛŒØ® ØªÚ©)</label>
+                    <input type="date" name="toDate" class="form-control" value="@defaultToDate" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-dark w-100">
+                        <i class="bi bi-search"></i> Generate
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    var customer = ViewBag.Customer as ProjectManagement.Models.Customer;
+    var fromDate = (DateTime)ViewBag.FromDate;
+    var toDate = (DateTime)ViewBag.ToDate;
+    var openingBalance = (decimal)ViewBag.OpeningBalance;
+    var saleVouchers = ViewBag.PurchaseVouchers as List<ProjectManagement.Models.Voucher>;
+    var receiptVouchers = ViewBag.PaymentVouchers as List<ProjectManagement.Models.Voucher>;
+    var totalBillWeight = (decimal)ViewBag.TotalBillWeight;
+    var totalBillKat = (decimal)ViewBag.TotalBillKat;
+    var totalBillQty = (decimal)ViewBag.TotalBillQty;
+    var totalBillAmount = (decimal)ViewBag.TotalBillAmount;
+    var totalPayment = (decimal)ViewBag.TotalPayment;
+    var closingBalance = (decimal)ViewBag.ClosingBalance;
+
+    <!-- Filter / Actions (no print) -->
+    <div class="d-print-none mb-3">
+        <div class="card">
+            <div class="card-body py-2">
+                <form method="get" class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small">Customer</label>
+                        @Html.DropDownList("customerId", ViewBag.Customers as SelectList, "Select Customer", new { @class = "form-select form-select-sm select2-customer" })
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold small">From Date</label>
+                        <input type="date" name="fromDate" value="@fromDate.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold small">To Date</label>
+                        <input type="date" name="toDate" value="@toDate.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-md-auto">
+                        <button type="submit" class="btn btn-dark btn-sm"><i class="bi bi-search"></i> Filter</button>
+                        <button type="button" class="btn btn-secondary btn-sm ms-1" onclick="window.print()">
+                            <i class="bi bi-printer"></i> Print
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm ms-1" onclick="downloadPDF()">
+                            <i class="bi bi-file-earmark-pdf"></i> PDF
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== KHATA PAGE (PDF-style) ===== -->
+    <div class="khata-page" id="khataContent">
+
+        <!-- Top bar: Printed date / time + page -->
+        <div class="khata-header-bar">
+            <span>Printed: @DateTime.Now.ToString("dd-MMM-yyyy")</span>
+            <span style="font-size:11px;">Print Time:@DateTime.Now.ToString("hh:mm:ss tt")</span>
+            <span>ØµÙØ­Û Ù†Ù…Ø¨Ø±: 1 / 1</span>
+        </div>
+
+        <!-- Company Title -->
+        <div class="khata-title-block" style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px;">
+            <!-- Left side: spacer -->
+            <div style="min-width:180px;"></div>
+            <!-- Center: main title -->
+            <div style="flex:1; text-align:center;">
+                <h2 style="margin:0 0 10px 0; font-size:26px; font-weight:700; font-family:'Noto Nastaliq Urdu',serif;">Ø§Ù„Ø­Ø§ÙØ¸ Ø³Ú©Ø±ÛŒÙ¾ ÚˆÛŒÙ„Ø±</h2>
+                <div style="font-size:13px; font-family:'Noto Nastaliq Urdu',serif; color:#333;padding-top:10px;">Ù¾Ø±Ø§Ù†Û Ú†ÛŒÙ†ÛŒÙˆÙ¹ Ø±ÙˆÚˆ Ø¬Ú¾Ù†Ú¯ Ø³Ù¹ÛŒ</div>
+            </div>
+            <!-- Right side: contact, forced LTR table so label stays left of number -->
+            <div style="min-width:180px; display:flex; justify-content:center; align-items:center;">
+                <table style="border:none; border-collapse:collapse; direction:ltr; text-align:left;">
+                    <tr>
+
+                        <td style="border:none; padding-top:10px; font-family:Arial,sans-serif; font-weight:700; font-size:11px; color:#111; letter-spacing:1px;">03137087857</td>
+                        <td style="border:none; padding:2px 4px; font-family:'Noto Nastaliq Urdu',serif; font-weight:700; font-size:11px; color:#000; white-space:nowrap; direction:ltr; unicode-bidi:embed;">: Ø±Ø§Ø¨Ø·Û Ù†Ù…Ø¨Ø±</td>
+                    </tr>
+                    <tr>
+                        <td style="border:none; padding-top:10px; font-family:Arial,sans-serif; font-weight:700; font-size:11px; color:#111; letter-spacing:1px;">03400798014</td>
+                        <td style="border:none; padding:2px 4px; font-family:'Noto Nastaliq Urdu',serif; font-weight:700; font-size:11px; color:#000; white-space:nowrap; direction:ltr; unicode-bidi:embed;">: Ø±Ø§Ø¨Ø·Û Ù†Ù…Ø¨Ø±</td>
+
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Customer Info + Date Range + Advanced Balance -->
+        @{
+            var advancedBalance = (decimal)(ViewBag.AdvancedBalance ?? 0m);
+        }
+        <div style="display:flex; gap:8px; align-items:stretch; margin-bottom:6px;">
+            <!-- Customer Info Table -->
+            <div style="flex:1;">
+                <table class="khata-info-table" style="margin-bottom:0;">
+                    <tr>
+                        <td style="width:50%; text-align:right; direction:rtl;">
+                            <span class="label" style="margin-left:14px;">Ø§Ú©Ø§Ø¤Ù†Ù¹ Ú©Ø§ Ù†Ø§Ù… :</span>
+                            <strong style="font-size:18px; color:#198754;"> @customer.Name</strong>
+                        </td>
+                        <td style="width:50%; text-align:right; direction:rtl;">
+                            <span class="label">Ø§Ø³ ØªØ§Ø±ÛŒØ® Ø³Û’ :</span>
+                            <strong> @fromDate.ToString("dd/MM/yyyy")</strong>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="text-align:right; direction:rtl;">
+                            <span class="label">Ù¾ØªÛ :</span>
+                            @if (!string.IsNullOrEmpty(customer.Address)) { <span> @customer.Address</span> }
+                        </td>
+                        <td style="text-align:right; direction:rtl;">
+                            <span class="label">Ø§Ø³ ØªØ§Ø±ÛŒØ® ØªÚ© :</span>
+                            <strong> @toDate.ToString("dd/MM/yyyy")</strong>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="text-align:right; direction:rtl;">
+                            <span class="label">Ù…ÙˆØ¨Ø§Ø¦Ù„ Ù†Ù…Ø¨Ø± :</span>
+                            @if (!string.IsNullOrEmpty(customer.Phone)) { <span> @customer.Phone</span> }
+                        </td>
+                        <td></td>
+                    </tr>
+                </table>
+            </div>
+            <!-- Advanced Balance Card (right side) -->
+            <div style="min-width:160px; border:2px solid #1a1a2e; border-radius:4px; background:#f0f4ff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8px 12px; text-align:center;">
+                <div style="font-family:'Noto Nastaliq Urdu',serif; font-size:12px; font-weight:700; color:#1a1a2e; margin-bottom:6px;">Ø§ÛŒÚˆÙˆØ§Ù†Ø³ Ø±Ù‚Ù…</div>
+                <div style="font-family:Arial,sans-serif; font-size:16px; font-weight:700;
+                    color:@(advancedBalance > 0 ? "#c00" : advancedBalance < 0 ? "#060" : "#555");">
+                    @Math.Abs(advancedBalance).ToString("N0")
+                </div>
+                <div style="font-family:'Noto Nastaliq Urdu',serif; font-size:10px; color:#666; margin-top:4px;">
+                    @if (advancedBalance > 0) { <span>ÙˆØ§Ø¬Ø¨ Ø§Ù„Ø§Ø¯Ø§</span> }
+                    else if (advancedBalance < 0) { <span>Ø¬Ù…Ø¹</span> }
+                    else { <span>Ú©ÙˆØ¦ÛŒ Ù†ÛÛŒÚº</span> }
+                </div>
+            </div>
+        </div>
+
+        <!-- English date range line -->
+        <div class="date-range-header">
+            From: @fromDate.ToString("dd/MM/yyyy") to: @toDate.ToString("dd/MM/yyyy")
+        </div>
+
+        <!-- ===== SALE TABLE (Sale entries) - RTL: ØªØ§Ø±ÛŒØ® first on right ===== -->
+        <div class="khata-section-header" style="margin-top:10px;">ÙØ±ÙˆØ®Øª ØªÙØµÛŒÙ„</div>
+        <table class="khata-table">
+            <thead>
+                <tr>
+                    <th style="min-width:80px;">ØªØ§Ø±ÛŒØ®</th>
+                    <th style="min-width:80px;">Ø±Ø³ÛŒØ¯Ù†Ù…Ø¨Ø±</th>
+                    <th style="min-width:80px;"># Ú¯ÛŒÙ¹ Ù¾Ø§Ø³</th>
+                    <th class="detail-col">Ø¢Ø¦ÛŒÙ¹Ù… ØªÙØµÛŒÙ„</th>
+                    <th>Ø³Ø¨ Ø¢Ø¦ÛŒÙ¹Ù…</th>
+                    <th>ÙˆØ²Ù† Ú©Ù„Ùˆ</th>
+                    <th>Ú©Ø§Ù¹</th>
+                    <th>ØµØ§ÙÛŒ ÙˆØ²Ù†</th>
+                    <th>Ù¾Ø±Ø§Ø¦Ø³</th>
+                    <th>Ø±Ù‚Ù…</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Opening Balance Row -->
+                <tr class="opening-row">
+                    <td colspan="2"></td>
+                    <td colspan="6" style="text-align:right; font-style:italic; color:#555;">
+                        Ù¾Ú†Ú¾Ù„Ø§ Ø¨ÛŒÙ„Ù†Ø³: (@fromDate.ToString("dd/MM/yyyy"))
+                    </td>
+                    <td colspan="2" style="text-align:right; font-weight:bold;">
+                        @(openingBalance >= 0 ? openingBalance.ToString("N2") : $"({Math.Abs(openingBalance):N2})")
+                    </td>
+                </tr>
+
+                @if (saleVouchers != null && saleVouchers.Any())
+                {
+                    @foreach (var v in saleVouchers)
+                    {
+                        var isCcrPaid = v.VoucherType == ProjectManagement.Models.VoucherType.CCR;
+                        string itemName;
+                        if (isCcrPaid)
+                        {
+                            // CCR where this customer is the Purchasing customer: money paid to
+                            // another (receiving) customer on their behalf â†’ shown in the top table
+                            itemName = "PAID TO " + (v.ReceivingCustomer?.Name ?? "-")
+                                + (string.IsNullOrEmpty(v.PurchasingCustomerDetails) ? "" : $" {v.PurchasingCustomerDetails}");
+                        }
+                        else
+                        {
+                            itemName = v.Item?.Name ?? "-";
+                        }
+                        var weight = v.Weight.HasValue ? v.Weight.Value.ToString("N2") : "-";
+                        var kat = v.Kat.HasValue ? v.Kat.Value.ToString("N2") : "0.00";
+                        var qty = v.Quantity.HasValue ? v.Quantity.Value.ToString("N2") : "-";
+                        var rate = v.Rate.HasValue ? v.Rate.Value.ToString("N0") : "-";
+                        var amount = v.Amount.ToString("N0");
+                        var gariNo = v.GariNo ?? "";
+                        var txnNo = v.TransactionNumber;
+                        var vdate = v.VoucherDate.ToString("dd/MM/yyyy");
+                        var mon = v.Mon ?? "-";
+                        <tr>
+                            <td>@vdate</td>
+                            <td>@txnNo</td>
+                            <td>@gariNo</td>
+                            <td class="detail-col">@itemName</td>
+                            <td>@mon</td>
+                            <td class="text-right">@weight</td>
+                            <td class="text-right">@kat</td>
+                            <td class="text-right">@qty</td>
+                            <td class="text-right">@rate</td>
+                            <td class="text-right">@amount</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="10" style="text-align:center; padding:10px; color:#888;">Ú©ÙˆØ¦ÛŒ ÙØ±ÙˆØ®Øª Ù†ÛÛŒÚº Ù…Ù„ÛŒ</td>
+                    </tr>
+                }
+
+                <!-- Total Row -->
+                <tr class="total-row">
+                    <td colspan="2"></td>
+                    <td colspan="3" style="text-align:right; font-weight:bold;">Ù¹ÙˆÙ¹Ù„ :</td>
+                    <td class="text-right">@totalBillWeight.ToString("N2")</td>
+                    <td class="text-right">@totalBillKat.ToString("N2")</td>
+                    <td class="text-right">@totalBillQty.ToString("N2")</td>
+                    <td></td>
+                    <td class="text-right">@totalBillAmount.ToString("N2")</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- ===== RECEIPT TABLE (Ø±Ù‚Ù… ÙˆØµÙˆÙ„ÛŒ) - RTL: ØªØ§Ø±ÛŒØ® first on right ===== -->
+        <div class="khata-section-header" style="margin-top:12px;">Ø±Ù‚Ù… ÙˆØµÙˆÙ„ÛŒ</div>
+        <table class="khata-table">
+            <thead>
+                <tr>
+                    <th>ØªØ§Ø±ÛŒØ®</th>
+                    <th>Ø±Ø³ÛŒØ¯Ù†Ù…Ø¨Ø±</th>
+                    <th># Ú¯ÛŒÙ¹ Ù¾Ø§Ø³</th>
+                    <th class="detail-col">ØªÙØµÛŒÙ„</th>
+                    <th>Ù†Ø§Ù…</th>
+                    <th>Ø¬Ù…Ø¹</th>
+                    <th>Ø¨Ù‚ÛŒÛ Ø±Ù‚Ù…</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (receiptVouchers != null && receiptVouchers.Any())
+                {
+                    decimal runningPayTotal = 0;
+                    @foreach (var v in receiptVouchers)
+                    {
+                        runningPayTotal += v.Amount;
+                        var details = v.ReceivingCustomerDetails ?? v.PurchasingCustomerDetails ?? v.BankCustomerReceiverDetails ?? v.BankCustomerPaidDetails ?? "";
+                        var voucherDesc = v.VoucherType switch {
+                            ProjectManagement.Models.VoucherType.CashReceived => "CASH RECEIVED",
+                            ProjectManagement.Models.VoucherType.CashPaid => "CASH",
+                            ProjectManagement.Models.VoucherType.AdvancedPayment => "ADVANCE",
+                            // CCR where this customer is the Receiving customer: money received from
+                            // another (purchasing) customer on their behalf â†’ shown in the receipt table
+                            ProjectManagement.Models.VoucherType.CCR => "RECEIVED FROM " + (v.PurchasingCustomer?.Name ?? "-"),
+                            _ => v.VoucherType.ToString()
+                        };
+                        var fullDetails = string.IsNullOrEmpty(details) ? voucherDesc : $"{voucherDesc} {details}";
+                        <tr>
+                            <td>@v.VoucherDate.ToString("dd/MM/yyyy")</td>
+                            <td>@v.TransactionNumber</td>
+                            <td>@(v.GariNo ?? "")</td>
+                            <td class="text-left detail-col">@fullDetails</td>
+                            <td class="text-right">@v.Amount.ToString("N2")</td>
+                            <td class="text-right">0.00</td>
+                            <td class="text-right">@runningPayTotal.ToString("N2")</td>
+                        </tr>
+                    }
+
+                    <!-- Receipt Total Row -->
+                    <tr class="total-row">
+                        <td colspan="4" style="text-align:right; font-weight:bold;">
+                            Ù†ÛŒÙ¹ Ø¨ÛŒÙ„Ù†Ø³ (@toDate.ToString("dd/MM/yyyy"))
+                        </td>
+                        <td class="text-right">@totalPayment.ToString("N2")</td>
+                        <td class="text-right">0.00</td>
+                        <td class="text-right">@totalPayment.ToString("N2")</td>
+                    </tr>
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding:10px; color:#888;">Ú©ÙˆØ¦ÛŒ ÙˆØµÙˆÙ„ÛŒ Ù†ÛÛŒÚº Ù…Ù„ÛŒ</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- ===== SUMMARY BOX ===== -->
+        @{
+            // Sale-side sign convention:
+            // Opening balance positive = customer owes us (green here we show raw),
+            // Sale increases what the customer owes us (DR, +).
+            // Receipt decreases what they owe (CR, -).
+            var displayOpening  = openingBalance;                            // positive = customer owes us
+            var displaySale     = totalBillAmount;                           // sale adds to what they owe
+            var totalKhata      = displayOpening + displaySale;              // combined receivable
+            var displayClosing  = totalKhata - totalPayment;                 // subtract receipts to reduce receivable
+        }
+        <div class="balance-box" style="margin-top:14px;">
+            <div style="text-align:center; font-weight:bold; font-size:13px; border-bottom:1px solid #ccc; padding:8px 4px; margin-bottom:6px;">
+                Ù¹ÙˆÙ¹Ù„ Ø±Ù‚Ù… ÙˆØµÙˆÙ„ÛŒ : <strong>@totalPayment.ToString("N2")</strong>
+            </div>
+            <table>
+                <tr>
+                    <td class="bal-label" style="width:50%;">Ù¾Ø±Ø§Ù†Ø§ Ø¨ÛŒÙ„Ù†Ø³ :</td>
+                    <td class="bal-value" style="width:50%; direction:ltr; text-align:left; color:@(displayOpening >= 0 ? "#060" : "#c00");">
+                        @(displayOpening > 0 ? "+" : "")@displayOpening.ToString("N2")
+                    </td>
+                </tr>
+                <tr>
+                    <td class="bal-label" style="padding-bottom:4px;">Ù¹ÙˆÙ¹Ù„ ÙØ±ÙˆØ®Øª :</td>
+                    <td class="bal-value" style="color:#060; direction:ltr; text-align:left; padding-bottom:4px;">
+                        +@displaySale.ToString("N2")
+                    </td>
+                </tr>
+                <tr>
+                    <td class="bal-label" style="border-top:1px solid #bbb; border-bottom:1px solid #bbb; padding:4px 8px; background:#f0f0f0;">Ù¹ÙˆÙ¹Ù„ Ú©Ú¾Ø§ØªØ§ :</td>
+                    <td class="bal-value" style="direction:ltr; text-align:left; border-top:1px solid #bbb; border-bottom:1px solid #bbb; padding:4px 8px; background:#f0f0f0; color:@(totalKhata >= 0 ? "#060" : "#c00");">
+                        @(totalKhata > 0 ? "+" : "")@totalKhata.ToString("N2")
+                    </td>
+                </tr>
+                <tr>
+                    <td class="bal-label" style="border-bottom:2px solid #555; padding-bottom:4px; padding-top:10px;">Ù¹ÙˆÙ¹Ù„ ÙˆØµÙˆÙ„ÛŒ :</td>
+                    <td class="bal-value" style="color:#c00; direction:ltr; text-align:left; border-bottom:2px solid #555; padding-bottom:4px; padding-top:10px;">
+                        -@totalPayment.ToString("N2")
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Net Balance -->
+        <div class="net-balance-box">
+            <span>Ù…ÙˆØ¬ÙˆØ¯Û Ø¨ÛŒÙ„Ù†Ø³ :</span>
+            <span style="direction:ltr; display:inline-flex; align-items:center; gap:6px;">
+                <strong style="color:@(displayClosing > 0 ? "#060" : "#c00");">@Math.Abs(displayClosing).ToString("N2")</strong>
+                @if (displayClosing > 0)
+                {
+                    <span style="color:#060; font-weight:bold;">ÙˆØ§Ø¬Ø¨ Ø§Ù„ÙˆØµÙˆÙ„</span>
+                }
+                else if (displayClosing < 0)
+                {
+                    <span style="color:#c00; font-weight:bold;">Ø¬Ù…Ø¹</span>
+                }
+                else
+                {
+                    <span style="font-weight:bold;">ØµÙØ±</span>
+                }
+            </span>
+        </div>
+
+    </div><!-- end khata-page -->
+}
+
+@section Scripts {
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    // Make the Customer dropdown a searchable, type-to-filter box
+    $(document).ready(function () {
+        $('.select2-customer').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: 'Search customer... / Ú©Ø³Ù¹Ù…Ø± ØªÙ„Ø§Ø´ Ú©Ø±ÛŒÚº',
+            allowClear: true
+        });
+    });
+
+    // Site branding for the PDF footer (set in Theme Settings, saved to sitesettings.json)
+    var SITE = {
+        name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.SiteName)),
+        showDev: @(site.ShowDeveloperInfo ? "true" : "false"),
+        devName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.DeveloperName)),
+        devContact: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.DeveloperContact))
+    };
+
+    function buildSiteFooter() {
+        var wrap = document.createElement('div');
+        wrap.style.cssText = 'margin-top:14px;padding-top:8px;border-top:1px solid #999;text-align:center;font-family:Arial,sans-serif;direction:ltr;';
+
+        var line1 = document.createElement('div');
+        line1.style.cssText = 'font-size:11px;color:#333;font-weight:600;';
+        line1.textContent = 'This report was generated by ' + SITE.name + ' Management System';
+        wrap.appendChild(line1);
+
+        if (SITE.showDev) {
+            var line2 = document.createElement('div');
+            line2.style.cssText = 'font-size:10px;color:#666;margin-top:3px;';
+            line2.textContent = 'Software developed by ' + SITE.devName + ' - Contact: ' + SITE.devContact + ' for the management software';
+            wrap.appendChild(line2);
+        }
+        return wrap;
+    }
+
+    function downloadPDF() {
+        // Clone the report so we can append the footer without altering the visible page.
+        var element = document.getElementById('khataContent').cloneNode(true);
+        element.appendChild(buildSiteFooter());
+
+        var customerName = '@(ViewBag.Customer != null ? (ViewBag.Customer as ProjectManagement.Models.Customer)?.Name : "Khata")';
+        var fromDate = '@(ViewBag.FromDate != null ? ((DateTime)ViewBag.FromDate).ToString("ddMMyyyy") : "")';
+        var toDate = '@(ViewBag.ToDate != null ? ((DateTime)ViewBag.ToDate).ToString("ddMMyyyy") : "")';
+        var fileName = 'KhataReportSale_' + customerName.replace(/\s+/g, '_') + '_' + fromDate + '_' + toDate + '.pdf';
+
+        var opt = {
+            margin: [8, 6, 8, 6],
+            filename: fileName,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        html2pdf().set(opt).from(element).save();
+    }
+</script>
+}
+

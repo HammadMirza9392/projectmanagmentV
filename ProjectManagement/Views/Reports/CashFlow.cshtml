@@ -1,0 +1,422 @@
+﻿@* Views/Reports/CashFlow.cshtml *@
+@inject ProjectManagement.Services.SiteSettingsService SiteSettings
+@{
+    ViewData["Title"] = "Cash Flow Report";
+    var site = SiteSettings.Get();
+    var cashIn = ViewBag.CashIn != null ? (decimal)ViewBag.CashIn : 0;
+    var cashOut = ViewBag.CashOut != null ? (decimal)ViewBag.CashOut : 0;
+    var openingBalance = ViewBag.OpeningBalance != null ? (decimal)ViewBag.OpeningBalance : 0;
+    var closingBalance = ViewBag.ClosingBalance != null ? (decimal)ViewBag.ClosingBalance : 0;
+    var fromDate = ViewBag.FromDate != null ? (DateTime)ViewBag.FromDate : DateTime.Today.AddDays(-30);
+    var toDate = ViewBag.ToDate != null ? (DateTime)ViewBag.ToDate : DateTime.Today;
+    var vouchers = ViewBag.CashVouchers as IEnumerable<ProjectManagement.Models.Voucher>;
+}
+
+<div class="d-print-none">
+    <h2><i class="bi bi-cash-stack"></i> Cash Flow Report</h2>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="fromDate" value="@fromDate.ToString("yyyy-MM-dd")" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="toDate" value="@toDate.ToString("yyyy-MM-dd")" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Generate Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+            <i class="bi bi-cash"></i> Cash Flow Summary
+        </h5>
+        <small>Period: @fromDate.ToString("dd-MMM-yyyy") to @toDate.ToString("dd-MMM-yyyy")</small>
+    </div>
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h6 class="card-title">Opening Balance</h6>
+                        <h3 class="mb-0">Rs. @string.Format("{0:N0}", openingBalance)</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h6 class="card-title">Cash In</h6>
+                        <h3 class="mb-0">Rs. @string.Format("{0:N0}", cashIn)</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-danger text-white">
+                    <div class="card-body">
+                        <h6 class="card-title">Cash Out</h6>
+                        <h3 class="mb-0">Rs. @string.Format("{0:N0}", cashOut)</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-@(closingBalance >= 0 ? "primary" : "warning") text-white">
+                    <div class="card-body">
+                        <h6 class="card-title">Closing Balance</h6>
+                        <h3 class="mb-0">Rs. @string.Format("{0:N0}", closingBalance)</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <canvas id="cashFlowChart" width="400" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Cash Transactions</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-sm" id="cashFlowTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Transaction No</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Customer/Party</th>
+                        <th>Project</th>
+                        <th class="text-end">Cash In</th>
+                        <th class="text-end">Cash Out</th>
+                        <th class="text-end">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Opening Balance Row -->
+                    <tr class="table-warning">
+                        <td>@fromDate.ToString("dd-MMM-yy")</td>
+                        <td>-</td>
+                        <td><span class="badge bg-secondary">Opening</span></td>
+                        <td class="fw-bold">Opening Balance</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td class="text-end">-</td>
+                        <td class="text-end">-</td>
+                        <td class="text-end fw-bold @(openingBalance >= 0 ? "text-primary" : "text-danger")">
+                            @string.Format("{0:N0}", openingBalance)
+                        </td>
+                    </tr>
+                    @{
+                        decimal runningBalance = openingBalance;
+                        if (vouchers != null)
+                        {
+                            foreach (var voucher in vouchers)
+                            {
+                                bool isCashIn = (voucher.VoucherType == ProjectManagement.Models.VoucherType.Sale ||
+                                voucher.VoucherType == ProjectManagement.Models.VoucherType.CashReceived ||
+                                voucher.VoucherType == ProjectManagement.Models.VoucherType.ATMCash) &&
+                                voucher.CashType == ProjectManagement.Models.CashType.Cash;
+                                bool isCashOut = (voucher.VoucherType == ProjectManagement.Models.VoucherType.Purchase ||
+                                voucher.VoucherType == ProjectManagement.Models.VoucherType.Expense ||
+                                voucher.VoucherType == ProjectManagement.Models.VoucherType.CashPaid ||
+                                voucher.VoucherType == ProjectManagement.Models.VoucherType.Hazri) &&
+                                voucher.CashType == ProjectManagement.Models.CashType.Cash;
+
+                                if (isCashIn)
+                                    runningBalance += voucher.Amount;
+                                else if (isCashOut)
+                                    runningBalance -= voucher.Amount;
+
+                                <tr>
+                                    <td>@voucher.VoucherDate.ToPkShortDate()</td>
+                                    <td>
+                                        <a asp-controller="Vouchers" asp-action="Details" asp-route-id="@voucher.Id">
+                                            @voucher.TransactionNumber
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">@voucher.VoucherType</span>
+                                    </td>
+                                    <td>
+                                        @if (voucher.VoucherType == ProjectManagement.Models.VoucherType.Expense)
+                                        {
+                                            <strong>@(voucher.ExpenseHead?.Name ?? "Expense")</strong>
+                                            @if (!string.IsNullOrEmpty(voucher.ExpenseHeadDetails))
+                                            {
+                                                <br /><small class="text-muted">@voucher.ExpenseHeadDetails</small>
+                                            }
+                                        }
+                                        else if (voucher.VoucherType == ProjectManagement.Models.VoucherType.ATMCash)
+                                        {
+                                            <strong>ATM Cash (from Bank)</strong>
+                                            @if (!string.IsNullOrEmpty(voucher.BankCustomerPaidDetails))
+                                            {
+                                                <br /><small class="text-muted">@voucher.BankCustomerPaidDetails</small>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            @(voucher.Item?.Name ??
+                                            voucher.PurchasingCustomerDetails ?? voucher.ReceivingCustomerDetails ??
+                                            "Cash Transaction")
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (voucher.VoucherType == ProjectManagement.Models.VoucherType.Expense)
+                                        {
+                                            <span>-</span>
+                                        }
+                                        else if (voucher.VoucherType == ProjectManagement.Models.VoucherType.ATMCash)
+                                        {
+                                            @(voucher.BankCustomerPaid?.Name ?? "-")
+                                        }
+                                        else
+                                        {
+                                            @(voucher.PurchasingCustomer?.Name ?? voucher.ReceivingCustomer?.Name ?? "-")
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (voucher.Project != null)
+                                        {
+                                            <a asp-controller="Reports" asp-action="ProjectReport" asp-route-projectId="@voucher.ProjectId" class="text-decoration-none">
+                                                @voucher.Project.Name
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        @if (isCashIn)
+                                        {
+                                            <span class="text-success">@string.Format("{0:N0}", voucher.Amount)</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        @if (isCashOut)
+                                        {
+                                            <span class="text-danger">@string.Format("{0:N0}", voucher.Amount)</span>
+                                        }
+                                    </td>
+                                    <td class="text-end fw-bold @(runningBalance >= 0 ? "text-primary" : "text-danger")">
+                                        @string.Format("{0:N0}", runningBalance)
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="table-dark">
+                        <th>Total</th>
+                        <th></th>
+                        <th></th>
+                        <th></th>
+                        <th></th>
+                        <th></th>
+                        <th class="text-end">@string.Format("{0:N0}", cashIn)</th>
+                        <th class="text-end">@string.Format("{0:N0}", cashOut)</th>
+                        <th class="text-end">@string.Format("{0:N0}", closingBalance)</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3 d-print-none">
+    <button onclick="window.print()" class="btn btn-primary">
+        <i class="bi bi-printer"></i> Print Report
+    </button>
+    <button onclick="generatePDF()" class="btn btn-danger"
+            data-from-date="@fromDate.ToString("yyyyMMdd")" data-to-date="@toDate.ToString("yyyyMMdd")">
+        <i class="bi bi-file-pdf"></i> Generate PDF
+    </button>
+    <a asp-action="DailyCashBook" class="btn btn-info">
+        <i class="bi bi-journal-text"></i> Daily Cash Book
+    </a>
+    <a asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Reports
+    </a>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- html2pdf.js CDN (screenshot-style PDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        // Site branding for the PDF footer (set in Theme Settings, saved to sitesettings.json)
+        var SITE = {
+            name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.SiteName)),
+            showDev: @(site.ShowDeveloperInfo ? "true" : "false"),
+            devName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.DeveloperName)),
+            devContact: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.DeveloperContact))
+        };
+
+        // Builds the site-name + (optional) developer footer block appended to the
+        // bottom of the cloned report so it appears in the screenshot-style PDF.
+        function buildSiteFooter() {
+            var wrap = document.createElement('div');
+            wrap.style.cssText = 'margin-top:14px;padding-top:8px;border-top:1px solid #999;text-align:center;font-family:Arial,sans-serif;';
+
+            var line1 = document.createElement('div');
+            line1.style.cssText = 'font-size:11px;color:#333;font-weight:600;';
+            line1.textContent = 'This report was generated by ' + SITE.name + ' Management System';
+            wrap.appendChild(line1);
+
+            if (SITE.showDev) {
+                var line2 = document.createElement('div');
+                line2.style.cssText = 'font-size:10px;color:#666;margin-top:3px;';
+                line2.textContent = 'Software developed by ' + SITE.devName + ' — Contact: ' + SITE.devContact + ' for the management software';
+                wrap.appendChild(line2);
+            }
+            return wrap;
+        }
+
+        $(document).ready(function() {
+            $('#cashFlowTable').DataTable({
+                // No initial re-sort: keep the server order so the Opening Balance row
+                // stays pinned at the top and vouchers remain in date order.
+                "order": [],
+                // Show all rows on one page (no pagination / no scrolling) so the full
+                // table is always visible and every row is captured in the PDF.
+                "paging": false,
+                "info": false
+            });
+
+            // Create cash flow chart
+            var ctx = document.getElementById('cashFlowChart').getContext('2d');
+            var myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Opening Balance', 'Cash In', 'Cash Out', 'Closing Balance'],
+                    datasets: [{
+                        label: 'Amount (Rs.)',
+                        data: [@openingBalance, @cashIn, @cashOut, @closingBalance],
+                        backgroundColor: [
+                            'rgba(23, 162, 184, 0.5)',
+                            'rgba(40, 167, 69, 0.5)',
+                            'rgba(220, 53, 69, 0.5)',
+                            'rgba(13, 110, 253, 0.5)'
+                        ],
+                        borderColor: [
+                            'rgba(23, 162, 184, 1)',
+                            'rgba(40, 167, 69, 1)',
+                            'rgba(220, 53, 69, 1)',
+                            'rgba(13, 110, 253, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        });
+
+        // Builds a clean clone of just the report (no navbar/footer/buttons/chart),
+        // expanded so html2pdf captures every row and column, with the site footer appended.
+        function buildPdfElement() {
+            const element = document.querySelector('body').cloneNode(true);
+            element.style.display = 'block';
+            element.style.height = 'auto';
+
+            // Strip site chrome, screen-only controls, the chart canvas, and DataTables bars.
+            element.querySelectorAll('header, footer, .modal, .d-print-none, #cashFlowChart, .dataTables_filter, .dataTables_length, .dataTables_paginate, .dataTables_info')
+                   .forEach(el => el.remove());
+
+            element.querySelectorAll('.table-responsive').forEach(function(el) {
+                el.style.maxHeight = 'none';
+                el.style.overflow = 'visible';
+                el.style.overflowX = 'visible';
+                el.style.overflowY = 'visible';
+            });
+
+            element.querySelectorAll('#cashFlowTable thead').forEach(t => t.style.display = 'table-header-group');
+            element.querySelectorAll('#cashFlowTable thead th').forEach(th => th.style.position = 'static');
+            element.querySelectorAll('#cashFlowTable tfoot').forEach(t => t.style.display = 'table-footer-group');
+
+            // Columns: Date, Txn No, Type, Description, Customer/Party, Project, Cash In, Cash Out, Balance
+            const colWidths = ['9%', '10%', '9%', '15%', '13%', '11%', '11%', '11%', '11%'];
+            element.querySelectorAll('#cashFlowTable').forEach(function(tbl) {
+                tbl.style.width = '100%';
+                tbl.style.tableLayout = 'fixed';
+                const existing = tbl.querySelector('colgroup');
+                if (existing) existing.remove();
+                const colgroup = document.createElement('colgroup');
+                colWidths.forEach(function(w) {
+                    const col = document.createElement('col');
+                    col.style.width = w;
+                    colgroup.appendChild(col);
+                });
+                tbl.insertBefore(colgroup, tbl.firstChild);
+            });
+            element.querySelectorAll('#cashFlowTable th, #cashFlowTable td').forEach(function(cell) {
+                cell.style.wordBreak = 'break-word';
+                cell.style.whiteSpace = 'normal';
+                cell.style.overflowWrap = 'anywhere';
+                cell.style.fontSize = '10px';
+                cell.style.padding = '4px 4px';
+                cell.style.verticalAlign = 'middle';
+            });
+
+            var main = element.querySelector('main') || element.querySelector('.container-fluid') || element;
+            main.appendChild(buildSiteFooter());
+
+            return element;
+        }
+
+        // Generate the screenshot-style PDF (all rows + columns), with the site footer.
+        function generatePDF() {
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating PDF...';
+            button.disabled = true;
+
+            const f = button.getAttribute('data-from-date') || '';
+            const t = button.getAttribute('data-to-date') || '';
+            const filename = 'CashFlow_' + f + '_' + t + '.pdf';
+
+            const element = buildPdfElement();
+            const opt = {
+                margin: [10, 10, 10, 10],
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0, windowHeight: element.scrollHeight },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(function() {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }).catch(function(error) {
+                console.error('PDF generation error:', error);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+    </script>
+}

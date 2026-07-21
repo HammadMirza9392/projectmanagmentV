@@ -1,0 +1,514 @@
+﻿@* Views/Reports/DailyCashBook.cshtml - Daily Cash Book Tracking from Vouchers (CashType = DailyCashBook) *@
+@inject ProjectManagement.Services.SiteSettingsService SiteSettings
+@{
+    ViewData["Title"] = "Daily Cash Book";
+    var site = SiteSettings.Get();
+    var vouchers = ViewBag.Vouchers as IEnumerable<ProjectManagement.Models.Voucher>;
+    var fromDate = ViewBag.FromDate != null ? (DateTime)ViewBag.FromDate : DateTime.Today.AddMonths(-1);
+    var toDate = ViewBag.ToDate != null ? (DateTime)ViewBag.ToDate : DateTime.Today;
+    var displayFromDate = fromDate.ToString("yyyy-MM-dd");
+    var displayToDate = toDate.ToString("yyyy-MM-dd");
+    var selectedCustomerId = ViewBag.SelectedCustomerId as int?;
+    var selectedVoucherType = ViewBag.SelectedVoucherType as string;
+    var openingBalance = ViewBag.OpeningBalance != null ? (decimal)ViewBag.OpeningBalance : 0;
+}
+
+
+<!-- Filter Form -->
+<div class="card mb-3 d-print-none">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-filter"></i> Filter Options</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-2">
+                <label class="form-label">From Date <span class="text-danger">*</span></label>
+                <input type="date" name="fromDate" value="@displayFromDate" class="form-control" required />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">To Date <span class="text-danger">*</span></label>
+                <input type="date" name="toDate" value="@displayToDate" class="form-control" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Filter by Customer</label>
+                @if (ViewBag.Customers != null)
+                {
+                    @Html.DropDownList("customerId", ViewBag.Customers as SelectList, "-- All Customers --", new { @class = "form-select" })
+                }
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Filter by Voucher Type</label>
+                @if (ViewBag.VoucherTypes != null)
+                {
+                    @Html.DropDownList("voucherType", ViewBag.VoucherTypes as SelectList, new { @class = "form-select" })
+                }
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-success w-100">
+                    <i class="bi bi-search"></i> Generate
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Report Header -->
+<div class="card mb-3">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0">
+            <i class="bi bi-journal-text"></i> Daily Cash Book - Statement
+        </h5>
+        <small>Period: @fromDate.ToString("dd-MMM-yyyy") to @toDate.ToString("dd-MMM-yyyy")</small>
+        @if (selectedCustomerId.HasValue && ViewBag.SelectedCustomer != null)
+        {
+            var customer = ViewBag.SelectedCustomer as ProjectManagement.Models.Customer;
+            <text> | Customer: @customer?.Name</text>
+        }
+        @if (!string.IsNullOrEmpty(selectedVoucherType))
+        {
+            <text> | Type: @selectedVoucherType</text>
+        }
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card bg-secondary text-white">
+                    <div class="card-body text-center">
+                        <h6>Opening Balance</h6>
+                        <h4 class="mb-0">Rs. @string.Format("{0:N0}", openingBalance)</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h6>Total Receipts</h6>
+                        <h4 class="mb-0">Rs. @string.Format("{0:N0}", ViewBag.TotalReceipts ?? 0)</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-danger text-white">
+                    <div class="card-body text-center">
+                        <h6>Total Payments</h6>
+                        <h4 class="mb-0">Rs. @string.Format("{0:N0}", ViewBag.TotalPayments ?? 0)</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h6>Closing Balance</h6>
+                        <h4 class="mb-0">Rs. @string.Format("{0:N0}", ViewBag.ClosingBalance ?? 0)</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transaction History -->
+<div class="card shadow-sm">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Daily Cash Book Transactions</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered mb-0" id="dailyCashBookTable">
+                <thead class="table-primary">
+                    <tr>
+                        <th class="fw-bold" style="font-size: 14px;">Date</th>
+                        <th class="fw-bold" style="font-size: 14px;">Transaction No</th>
+                        <th class="fw-bold" style="font-size: 14px;">Type</th>
+                        <th class="fw-bold" style="font-size: 14px;">Customer/Party</th>
+                        <th class="fw-bold" style="font-size: 14px;">Description</th>
+                        <th class="fw-bold" style="font-size: 14px;">Project</th>
+                        <th class="fw-bold" style="font-size: 14px;">Details</th>
+                        <th class="text-end fw-bold" style="font-size: 14px;">Receipt (In)</th>
+                        <th class="text-end fw-bold" style="font-size: 14px;">Payment (Out)</th>
+                        <th class="text-end fw-bold" style="font-size: 14px;">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        decimal runningBalance = openingBalance;
+                        decimal totalReceipts = 0;
+                        decimal totalPayments = 0;
+
+                        var allTransactions = new List<(DateTime Date, int Id, string TransNo, string Type, string Customer, string Desc, string Project, string Details, decimal Receipt, decimal Payment, bool IsVoucher)>();
+
+                        if (vouchers != null)
+                        {
+                            foreach (var v in vouchers)
+                            {
+                                decimal receipt = 0;
+                                decimal payment = 0;
+                                string customerName = "";
+                                string description = "";
+                                string projectName = v.Project?.Name ?? "-";
+                                string details = "";
+
+                                switch (v.VoucherType)
+                                {
+                                    case ProjectManagement.Models.VoucherType.Sale:
+                                        receipt = v.Amount;
+                                        customerName = v.ReceivingCustomer?.Name ?? v.ReceivingCustomerDetails ?? "N/A";
+                                        description = $"Sale - {v.Item?.Name ?? "N/A"}";
+                                        details = v.ReceivingCustomerDetails ?? "";
+                                        break;
+                                    case ProjectManagement.Models.VoucherType.CashReceived:
+                                        receipt = v.Amount;
+                                        customerName = v.ReceivingCustomer?.Name ?? v.ReceivingCustomerDetails ?? "N/A";
+                                        description = "Cash Received";
+                                        details = v.ReceivingCustomerDetails ?? "";
+                                        break;
+                                    case ProjectManagement.Models.VoucherType.ATMDailyCash:
+                                        receipt = v.Amount;
+                                        customerName = v.BankCustomerPaid?.Name ?? "ATM Withdrawal";
+                                        description = "ATM Daily Cash (from Bank)";
+                                        details = v.BankCustomerPaidDetails ?? "";
+                                        break;
+                                    case ProjectManagement.Models.VoucherType.Purchase:
+                                        payment = v.Amount;
+                                        customerName = v.PurchasingCustomer?.Name ?? v.PurchasingCustomerDetails ?? "N/A";
+                                        description = $"Purchase - {v.Item?.Name ?? "N/A"}";
+                                        details = v.PurchasingCustomerDetails ?? "";
+                                        break;
+                                    case ProjectManagement.Models.VoucherType.Expense:
+                                        payment = v.Amount;
+                                        customerName = v.ExpenseHead?.Name ?? "Expense";
+                                        description = "Expense";
+                                        details = v.ExpenseHeadDetails ?? "";
+                                        break;
+                                    case ProjectManagement.Models.VoucherType.CashPaid:
+                                        payment = v.Amount;
+                                        customerName = v.PurchasingCustomer?.Name ?? v.PurchasingCustomerDetails ?? "N/A";
+                                        description = "Cash Paid";
+                                        details = v.PurchasingCustomerDetails ?? "";
+                                        break;
+                                    case ProjectManagement.Models.VoucherType.Hazri:
+                                        payment = v.Amount;
+                                        customerName = "Labor";
+                                        description = $"Hazri - {v.ExpenseHead?.Name ?? v.Item?.Name ?? "Labor"}";
+                                        details = v.ExpenseHeadDetails ?? "";
+                                        break;
+                                }
+
+                                allTransactions.Add((v.VoucherDate, v.Id, v.TransactionNumber, v.VoucherType.ToString(), customerName, description, projectName, details, receipt, payment, true));
+                            }
+                        }
+
+                        // Sort by date and ID
+                        allTransactions = allTransactions.OrderBy(t => t.Date).ThenBy(t => t.Id).ToList();
+                    }
+
+                    <!-- Opening Balance Row -->
+                    <tr class="table-warning">
+                        <td class="fw-semibold">@fromDate.ToString("dd-MMM-yy")</td>
+                        <td>-</td>
+                        <td><span class="badge bg-secondary" style="font-size: 11px;">Opening</span></td>
+                        <td>-</td>
+                        <td class="fw-bold fs-6">Opening Balance</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td class="text-end">-</td>
+                        <td class="text-end">-</td>
+                        <td class="text-end fw-bold text-success">@string.Format("{0:N0}", openingBalance)</td>
+                    </tr>
+
+                    @foreach (var trans in allTransactions)
+                    {
+                        runningBalance += trans.Receipt - trans.Payment;
+                        totalReceipts += trans.Receipt;
+                        totalPayments += trans.Payment;
+
+                        <tr style="font-size: 13px;">
+                            <td class="align-middle">@trans.Date.ToString("dd-MMM-yy")</td>
+                            <td class="align-middle">
+                                @if (trans.IsVoucher)
+                                {
+                                    <a asp-controller="Vouchers" asp-action="Details" asp-route-id="@trans.Id">@trans.TransNo</a>
+                                }
+                                else
+                                {
+                                    @trans.TransNo
+                                }
+                            </td>
+                            <td class="align-middle"><span class="badge bg-@(trans.Receipt > 0 ? "success" : "danger")" style="font-size: 11px;">@trans.Type</span></td>
+                            <td class="align-middle">@trans.Customer</td>
+                            <td class="align-middle">@trans.Desc</td>
+                            <td class="align-middle">
+                                @if (trans.Project != "-")
+                                {
+                                    <span class="badge bg-info">@trans.Project</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td class="align-middle">
+                                @if (!string.IsNullOrEmpty(trans.Details))
+                                {
+                                    <small class="text-muted">@trans.Details</small>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td class="text-end align-middle @(trans.Receipt > 0 ? "text-success fw-semibold" : "")">
+                                @if (trans.Receipt > 0)
+                                {
+                                    <span>@string.Format("{0:N0}", trans.Receipt)</span>
+                                }
+                                else
+                                {
+                                    <text>-</text>
+                                }
+                            </td>
+                            <td class="text-end align-middle @(trans.Payment > 0 ? "text-danger fw-semibold" : "")">
+                                @if (trans.Payment > 0)
+                                {
+                                    <span>-@string.Format("{0:N0}", trans.Payment)</span>
+                                }
+                                else
+                                {
+                                    <text>-</text>
+                                }
+                            </td>
+                            <td class="text-end align-middle fw-bold @(runningBalance >= 0 ? "text-success" : "text-danger")">@string.Format("{0:N0}", Math.Abs(runningBalance))</td>
+                        </tr>
+                    }
+
+                    @if (!allTransactions.Any())
+                    {
+                        <tr>
+                            <td colspan="10" class="text-center text-muted py-4 fst-italic">
+                                <i class="bi bi-info-circle"></i> No Daily Cash Book transactions found for the selected period.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-success">
+                    <tr style="font-size: 15px;">
+                        <th colspan="7" class="fw-bold py-3 text-end">PERIOD TOTAL:</th>
+                        <th class="text-end text-success fw-bold py-3">Rs. @string.Format("{0:N0}", totalReceipts)</th>
+                        <th class="text-end text-danger fw-bold py-3">Rs. -@string.Format("{0:N0}", totalPayments)</th>
+                        <th class="text-end"></th>
+                    </tr>
+                    <tr style="font-size: 15px;">
+                        <th colspan="7" class="fw-bold py-3 text-end">CLOSING BALANCE (as of @toDate.ToString("dd-MMM-yyyy")):</th>
+                        <th colspan="2" class="text-end"></th>
+                        <th class="text-end fw-bold py-3 text-success">Rs. @string.Format("{0:N0}", openingBalance + totalReceipts - totalPayments)</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3 d-print-none">
+    <button onclick="window.print()" class="btn btn-primary">
+        <i class="bi bi-printer"></i> Print Statement
+    </button>
+    <button onclick="exportTableToExcel('dailyCashBookTable', 'DailyCashBook_@fromDate.ToString("yyyyMMdd")_@toDate.ToString("yyyyMMdd")')" class="btn btn-success">
+        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+    </button>
+    <button onclick="generatePDF()" class="btn btn-danger"
+            data-from-date="@fromDate.ToString("yyyyMMdd")" data-to-date="@toDate.ToString("yyyyMMdd")">
+        <i class="bi bi-file-pdf"></i> Generate PDF
+    </button>
+    <a asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Reports
+    </a>
+</div>
+
+@section Scripts {
+    <!-- html2pdf.js CDN (screenshot-style PDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        // Site branding for the PDF footer (set in Theme Settings, saved to sitesettings.json)
+        var SITE = {
+            name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.SiteName)),
+            showDev: @(site.ShowDeveloperInfo ? "true" : "false"),
+            devName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.DeveloperName)),
+            devContact: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.DeveloperContact))
+        };
+
+        // Builds the site-name + (optional) developer footer block appended to the
+        // bottom of the cloned report so it appears in the screenshot-style PDF.
+        function buildSiteFooter() {
+            var wrap = document.createElement('div');
+            wrap.style.cssText = 'margin-top:14px;padding-top:8px;border-top:1px solid #999;text-align:center;font-family:Arial,sans-serif;';
+
+            var line1 = document.createElement('div');
+            line1.style.cssText = 'font-size:11px;color:#333;font-weight:600;';
+            line1.textContent = 'This report was generated by ' + SITE.name + ' Management System';
+            wrap.appendChild(line1);
+
+            if (SITE.showDev) {
+                var line2 = document.createElement('div');
+                line2.style.cssText = 'font-size:10px;color:#666;margin-top:3px;';
+                line2.textContent = 'Software developed by ' + SITE.devName + ' â€” Contact: ' + SITE.devContact + ' for the management software';
+                wrap.appendChild(line2);
+            }
+            return wrap;
+        }
+
+        // Builds a clean clone of just the report, expanded so html2pdf captures every
+        // row and column, with the site footer appended at the bottom.
+        function buildPdfElement() {
+            const element = document.querySelector('body').cloneNode(true);
+            element.style.display = 'block';
+            element.style.height = 'auto';
+
+            element.querySelectorAll('header, footer, .modal, .d-print-none')
+                   .forEach(el => el.remove());
+
+            element.querySelectorAll('.table-responsive').forEach(function(el) {
+                el.style.maxHeight = 'none';
+                el.style.overflow = 'visible';
+                el.style.overflowX = 'visible';
+                el.style.overflowY = 'visible';
+            });
+
+            element.querySelectorAll('#dailyCashBookTable thead').forEach(t => t.style.display = 'table-header-group');
+            element.querySelectorAll('#dailyCashBookTable thead th').forEach(th => th.style.position = 'static');
+            element.querySelectorAll('#dailyCashBookTable tfoot').forEach(t => t.style.display = 'table-footer-group');
+
+            // Columns: Date, Txn No, Type, Customer, Description, Project, Details, Receipt, Payment, Balance
+            const colWidths = ['8%', '9%', '9%', '11%', '13%', '9%', '12%', '9%', '9%', '11%'];
+            element.querySelectorAll('#dailyCashBookTable').forEach(function(tbl) {
+                tbl.style.width = '100%';
+                tbl.style.tableLayout = 'fixed';
+                const existing = tbl.querySelector('colgroup');
+                if (existing) existing.remove();
+                const colgroup = document.createElement('colgroup');
+                colWidths.forEach(function(w) {
+                    const col = document.createElement('col');
+                    col.style.width = w;
+                    colgroup.appendChild(col);
+                });
+                tbl.insertBefore(colgroup, tbl.firstChild);
+            });
+            element.querySelectorAll('#dailyCashBookTable th, #dailyCashBookTable td').forEach(function(cell) {
+                cell.style.wordBreak = 'break-word';
+                cell.style.whiteSpace = 'normal';
+                cell.style.overflowWrap = 'anywhere';
+                cell.style.fontSize = '10px';
+                cell.style.padding = '4px 4px';
+                cell.style.verticalAlign = 'middle';
+            });
+
+            var main = element.querySelector('main') || element.querySelector('.container-fluid') || element;
+            main.appendChild(buildSiteFooter());
+
+            return element;
+        }
+
+        // Generate the screenshot-style PDF (all rows + columns), with the site footer.
+        function generatePDF() {
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating PDF...';
+            button.disabled = true;
+
+            const f = button.getAttribute('data-from-date') || '';
+            const t = button.getAttribute('data-to-date') || '';
+            const filename = 'DailyCashBook_' + f + '_' + t + '.pdf';
+
+            const element = buildPdfElement();
+            const opt = {
+                margin: [8, 8, 8, 8],
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0, windowHeight: element.scrollHeight },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(function() {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }).catch(function(error) {
+                console.error('PDF generation error:', error);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+
+        function exportTableToExcel(tableID, filename = ''){
+            var downloadLink;
+            var dataType = 'application/vnd.ms-excel';
+            var tableSelect = document.getElementById(tableID);
+            var tableHTML = tableSelect.outerHTML.replace(/ /g, '%20');
+
+            filename = filename?filename+'.xls':'excel_data.xls';
+            downloadLink = document.createElement("a");
+            document.body.appendChild(downloadLink);
+
+            if(navigator.msSaveOrOpenBlob){
+                var blob = new Blob(['ï»¿', tableHTML], {
+                    type: dataType
+                });
+                navigator.msSaveOrOpenBlob( blob, filename);
+            }else{
+                downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
+                downloadLink.download = filename;
+                downloadLink.click();
+            }
+        }
+    </script>
+
+    <style>
+        /* Enhanced table styling */
+        #dailyCashBookTable thead th {
+            background-color: #cfe2ff !important;
+            border-bottom: 2px solid #0d6efd;
+            padding: 12px 8px;
+        }
+
+        #dailyCashBookTable tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        #dailyCashBookTable {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        /* No fixed-height scroll container â€” the table expands to show every row
+           so all records are visible on screen and captured in the PDF. */
+        .table-responsive {
+            max-height: none;
+            overflow: visible;
+        }
+
+        @@media print {
+            .table { font-size: 9pt; }
+
+            .table-responsive {
+                max-height: none;
+                overflow: visible;
+            }
+
+            #dailyCashBookTable thead th {
+                position: static;
+            }
+
+            #dailyCashBookTable thead {
+                display: table-header-group;
+            }
+
+            #dailyCashBookTable tfoot {
+                display: table-footer-group;
+            }
+
+            #dailyCashBookTable tr {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+}
+

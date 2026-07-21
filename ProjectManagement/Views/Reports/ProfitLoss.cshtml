@@ -1,0 +1,777 @@
+﻿@* Views/Reports/ProfitLoss.cshtml *@
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    ViewData["Title"] = "Profit & Loss Report";
+    var project = ViewBag.Project as ProjectManagement.Models.Project;
+    var vouchers = ViewBag.Vouchers as IEnumerable<ProjectManagement.Models.Voucher>;
+    var totalSale = ViewBag.TotalSale != null ? (decimal)ViewBag.TotalSale : 0;
+    var totalStock = ViewBag.TotalStock != null ? (decimal)ViewBag.TotalStock : 0;
+    var revenue = ViewBag.Revenue != null ? (decimal)ViewBag.Revenue : 0;
+    var totalPurchase = ViewBag.TotalPurchase != null ? (decimal)ViewBag.TotalPurchase : 0;
+    var totalExpense = ViewBag.TotalExpense != null ? (decimal)ViewBag.TotalExpense : 0;
+    var expenses = ViewBag.Expenses != null ? (decimal)ViewBag.Expenses : 0;
+    var profitLoss = ViewBag.ProfitLoss != null ? (decimal)ViewBag.ProfitLoss : 0;
+    var fromDate = ViewBag.FromDate != null ? (DateTime)ViewBag.FromDate : DateTime.Today.AddMonths(-1);
+    var toDate = ViewBag.ToDate != null ? (DateTime)ViewBag.ToDate : DateTime.Today;
+    var selectedVoucherType = ViewBag.SelectedVoucherType as string;
+    var selectedItemId = ViewBag.SelectedItemId as int?;
+    var selectedCustomerId = ViewBag.SelectedCustomerId as int?;
+    var items = ViewBag.Items as SelectList;
+    var customers = ViewBag.Customers as SelectList;
+}
+
+<div class="d-print-none">
+    <h2><i class="bi bi-bar-chart"></i> Profit & Loss Report</h2>
+
+    <!-- Filter Section -->
+    <div class="card mb-3">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-funnel"></i> Filter Options</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" asp-action="ProjectReport" class="row g-3">
+                <input type="hidden" name="projectId" value="@(project?.Id)" />
+
+                <div class="col-md-2">
+                    <label class="form-label"><i class="bi bi-calendar"></i> From Date</label>
+                    <input type="date" name="fromDate" class="form-control" value="@fromDate.ToString("yyyy-MM-dd")" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label"><i class="bi bi-calendar"></i> To Date</label>
+                    <input type="date" name="toDate" class="form-control" value="@toDate.ToString("yyyy-MM-dd")" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label"><i class="bi bi-tag"></i> Voucher Type</label>
+                    <select name="voucherType" class="form-select">
+                        <option value="">-- All Types --</option>
+                        @if (selectedVoucherType == "Purchase")
+                        {
+                            <option value="Purchase" selected>Purchase</option>
+                        }
+                        else
+                        {
+                            <option value="Purchase">Purchase</option>
+                        }
+                        @if (selectedVoucherType == "Sale")
+                        {
+                            <option value="Sale" selected>Sale</option>
+                        }
+                        else
+                        {
+                            <option value="Sale">Sale</option>
+                        }
+                        @if (selectedVoucherType == "Expense")
+                        {
+                            <option value="Expense" selected>Expense</option>
+                        }
+                        else
+                        {
+                            <option value="Expense">Expense</option>
+                        }
+                        @if (selectedVoucherType == "Hazri")
+                        {
+                            <option value="Hazri" selected>Hazri</option>
+                        }
+                        else
+                        {
+                            <option value="Hazri">Hazri</option>
+                        }
+                        @if (selectedVoucherType == "CashReceived")
+                        {
+                            <option value="CashReceived" selected>Cash Received</option>
+                        }
+                        else
+                        {
+                            <option value="CashReceived">Cash Received</option>
+                        }
+                        @if (selectedVoucherType == "CashPaid")
+                        {
+                            <option value="CashPaid" selected>Cash Paid</option>
+                        }
+                        else
+                        {
+                            <option value="CashPaid">Cash Paid</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label"><i class="bi bi-box-seam"></i> Item</label>
+                    <select name="itemId" class="form-select">
+                        <option value="">-- All Items --</option>
+                        @if (items != null)
+                        {
+                            @foreach (var item in items)
+                            {
+                                @if (selectedItemId?.ToString() == item.Value)
+                                {
+                                    <option value="@item.Value" selected>@item.Text</option>
+                                }
+                                else
+                                {
+                                    <option value="@item.Value">@item.Text</option>
+                                }
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label"><i class="bi bi-person"></i> Customer</label>
+                    <select name="customerId" class="form-select">
+                        <option value="">-- All Customers --</option>
+                        @if (customers != null)
+                        {
+                            @foreach (var customer in customers)
+                            {
+                                @if (selectedCustomerId?.ToString() == customer.Value)
+                                {
+                                    <option value="@customer.Value" selected>@customer.Text</option>
+                                }
+                                else
+                                {
+                                    <option value="@customer.Value">@customer.Text</option>
+                                }
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label"><i class="bi bi-truck"></i> Gari No.</label>
+                    <input type="text" name="gariNo" class="form-control" value="@ViewBag.SelectedGariNo" placeholder="Vehicle No." />
+                </div>
+
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Filter
+                    </button>
+                </div>
+            </form>
+
+            @if (!string.IsNullOrEmpty(selectedVoucherType) || selectedItemId.HasValue || selectedCustomerId.HasValue)
+            {
+                <div class="mt-2 text-end">
+                    <a asp-action="ProjectReport"
+                       asp-route-projectId="@(project?.Id)"
+                       asp-route-fromDate="@fromDate.ToString("yyyy-MM-dd")"
+                       asp-route-toDate="@toDate.ToString("yyyy-MM-dd")"
+                       class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-x-circle"></i> Clear Filters
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(selectedVoucherType) || selectedItemId.HasValue || selectedCustomerId.HasValue)
+{
+    <div class="alert alert-info d-print-none">
+        <strong><i class="bi bi-funnel"></i> Active Filters:</strong>
+        @if (!string.IsNullOrEmpty(selectedVoucherType))
+        {
+            <span class="badge bg-primary ms-2">Type: @selectedVoucherType</span>
+        }
+        @if (selectedItemId.HasValue && items != null)
+        {
+            var itemName = items.FirstOrDefault(i => i.Value == selectedItemId.ToString())?.Text ?? "Unknown";
+            <span class="badge bg-success ms-2">Item: @itemName</span>
+        }
+        @if (selectedCustomerId.HasValue && customers != null)
+        {
+            var customerName = customers.FirstOrDefault(c => c.Value == selectedCustomerId.ToString())?.Text ?? "Unknown";
+            <span class="badge bg-warning text-dark ms-2">Customer: @customerName</span>
+        }
+    </div>
+}
+
+<div class="card mb-3">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+            <i class="bi bi-briefcase"></i> @(project?.Name ?? "Project") - P&L Statement
+        </h5>
+        <small>Period: @fromDate.ToString("dd-MMM-yyyy") to @toDate.ToString("dd-MMM-yyyy")</small>
+    </div>
+    <div class="card-body">
+        <!-- Row 1: Total Sale + Total Stock = Total Revenue -->
+        <div class="row g-2 text-center mb-2">
+            <div class="col-3">
+                <div class="card bg-success text-white h-100">
+                    <div class="card-body p-2">
+                        <small class="d-block"><i class="bi bi-cart-check"></i> Total Sale</small>
+                        <h5 class="mb-0">@string.Format("{0:N0}", totalSale)</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-1 d-flex align-items-center justify-content-center p-0">
+                <i class="bi bi-plus-circle text-success fs-3"></i>
+            </div>
+            <div class="col-3">
+                <div class="card bg-primary text-white h-100">
+                    <div class="card-body p-2">
+                        <small class="d-block"><i class="bi bi-box-seam"></i> Total Stock</small>
+                        <h5 class="mb-0">@string.Format("{0:N0}", totalStock)</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-1 d-flex align-items-center justify-content-center p-0">
+                <i class="bi bi-arrow-right-circle text-info fs-3"></i>
+            </div>
+            <div class="col-4">
+                <div class="card bg-info text-white h-100">
+                    <div class="card-body p-2">
+                        <small class="d-block"><i class="bi bi-cash-stack"></i> Total Revenue</small>
+                        <h4 class="mb-0 fw-bold">@string.Format("{0:N0}", revenue)</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Total Purchase + Total Expense = Total Expenses -->
+        <div class="row g-2 text-center mb-2">
+            <div class="col-3">
+                <div class="card bg-warning text-dark h-100">
+                    <div class="card-body p-2">
+                        <small class="d-block"><i class="bi bi-cart-plus"></i> Total Purchase</small>
+                        <h5 class="mb-0">@string.Format("{0:N0}", totalPurchase)</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-1 d-flex align-items-center justify-content-center p-0">
+                <i class="bi bi-plus-circle text-danger fs-3"></i>
+            </div>
+            <div class="col-3">
+                <div class="card bg-secondary text-white h-100">
+                    <div class="card-body p-2">
+                        <small class="d-block"><i class="bi bi-receipt"></i> Total Expense</small>
+                        <h5 class="mb-0">@string.Format("{0:N0}", totalExpense)</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-1 d-flex align-items-center justify-content-center p-0">
+                <i class="bi bi-arrow-right-circle text-danger fs-3"></i>
+            </div>
+            <div class="col-4">
+                <div class="card bg-danger text-white h-100">
+                    <div class="card-body p-2">
+                        <small class="d-block"><i class="bi bi-arrow-down-circle"></i> Total Expenses</small>
+                        <h4 class="mb-0 fw-bold">@string.Format("{0:N0}", expenses)</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: Net Profit/Loss -->
+        <div class="row g-2 text-center">
+            <div class="col-12">
+                <div class="card bg-@(profitLoss >= 0 ? "success" : "danger") text-white">
+                    <div class="card-body py-2">
+                        <h6 class="mb-1">
+                            <i class="bi bi-@(profitLoss >= 0 ? "graph-up" : "graph-down")"></i>
+                            Net @(profitLoss >= 0 ? "Profit" : "Loss")
+                        </h6>
+                        <h2 class="mb-0 fw-bold">Rs. @string.Format("{0:N0}", Math.Abs(profitLoss))</h2>
+                        <small>(Revenue: @string.Format("{0:N0}", revenue) - Expenses: @string.Format("{0:N0}", expenses))</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                            <tr>
+                                <th width="50%">Revenue Percentage:</th>
+                                <td>@(revenue + expenses > 0 ? ((revenue / (revenue + expenses)) * 100).ToString("N2") : "0.00")%</td>
+                            </tr>
+                            <tr>
+                                <th>Expense Percentage:</th>
+                                <td>@(revenue + expenses > 0 ? ((expenses / (revenue + expenses)) * 100).ToString("N2") : "0.00")%</td>
+                            </tr>
+                            <tr>
+                                <th>Profit Margin:</th>
+                                <td class="@(profitLoss >= 0 ? "text-success" : "text-danger") fw-bold">
+                                    @(revenue > 0 ? ((profitLoss / revenue) * 100).ToString("N2") : "0.00")%
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        @{
+            var itemSummary = ViewBag.ItemSummary as List<ProjectManagement.Controllers.ProjectItemSummary>;
+            if (itemSummary != null && itemSummary.Any())
+            {
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <h6 class="mb-2 fw-bold"><i class="bi bi-box-seam"></i> Item-wise Inventory Report</h6>
+                        <div class="table-responsive" style="overflow-x:auto;">
+                            <table class="table table-sm mb-0" id="inventoryTable">
+                                <thead>
+                                    <!-- Row 1: Group headers -->
+                                    <tr class="text-center text-white" style="font-size:12px;">
+                                        <th rowspan="2" class="inv-item-col align-middle">Item Name</th>
+                                        <th colspan="3" class="inv-g1">Opening Stock</th>
+                                        <th colspan="3" class="inv-g2">Purchase</th>
+                                        <th colspan="3" class="inv-g3">Total Qty</th>
+                                        <th colspan="3" class="inv-g4">Total Sold</th>
+                                        <th colspan="3" class="inv-g5">Stock Balance</th>
+                                    </tr>
+                                    <!-- Row 2: Sub-column headers -->
+                                    <tr class="text-center" style="font-size:11px;">
+                                        <th class="inv-sub inv-g1">Qty</th><th class="inv-sub inv-g1">Rate</th><th class="inv-sub inv-g1">Amount</th>
+                                        <th class="inv-sub inv-g2">Qty</th><th class="inv-sub inv-g2">Rate</th><th class="inv-sub inv-g2">Amount</th>
+                                        <th class="inv-sub inv-g3">Qty</th><th class="inv-sub inv-g3">Rate</th><th class="inv-sub inv-g3">Amount</th>
+                                        <th class="inv-sub inv-g4">Qty</th><th class="inv-sub inv-g4">Rate</th><th class="inv-sub inv-g4">Amount</th>
+                                        <th class="inv-sub inv-g5">Qty</th><th class="inv-sub inv-g5">Rate</th><th class="inv-sub inv-g5">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var s in itemSummary)
+                                    {
+                                        <tr class="text-end inv-row" style="font-size:12px;">
+                                            <td class="text-start fw-semibold inv-item-col">@s.ItemName <small class="text-muted">(@s.Unit)</small></td>
+                                            <td class="inv-g1">@s.OpeningStockQty.ToString("N3")</td>
+                                            <td class="inv-g1">@s.OpeningStockRate.ToString("N2")</td>
+                                            <td class="inv-g1">@string.Format("{0:N0}", s.OpeningStockAmount)</td>
+                                            <td class="inv-g2">@s.PurchaseQty.ToString("N3")</td>
+                                            <td class="inv-g2">@s.PurchaseRate.ToString("N2")</td>
+                                            <td class="inv-g2">@string.Format("{0:N0}", s.PurchaseAmount)</td>
+                                            <td class="inv-g3 fw-bold">@s.TotalQty.ToString("N3")</td>
+                                            <td class="inv-g3 fw-bold">@s.TotalQtyRate.ToString("N2")</td>
+                                            <td class="inv-g3 fw-bold">@string.Format("{0:N0}", s.TotalQtyAmount)</td>
+                                            <td class="inv-g4">@s.SaleQty.ToString("N3")</td>
+                                            <td class="inv-g4">@s.SaleRate.ToString("N2")</td>
+                                            <td class="inv-g4">@string.Format("{0:N0}", s.SaleAmount)</td>
+                                            <td class="inv-g5 fw-bold @(s.StockQty > 0 ? "text-success" : s.StockQty < 0 ? "text-danger" : "")">@s.StockQty.ToString("N3")</td>
+                                            <td class="inv-g5 fw-bold @(s.StockQty > 0 ? "text-success" : s.StockQty < 0 ? "text-danger" : "")">@s.StockRate.ToString("N2")</td>
+                                            <td class="inv-g5 fw-bold @(s.StockValue > 0 ? "text-success" : s.StockValue < 0 ? "text-danger" : "")">@string.Format("{0:N0}", s.StockValue)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="text-end fw-bold" style="font-size:12px;">
+                                        <td class="text-start" style="background:#1a1a2e; color:#fff; white-space:nowrap;">TOTAL</td>
+                                        <td class="inv-g1">@itemSummary.Sum(s => s.OpeningStockQty).ToString("N3")</td>
+                                        <td class="inv-g1">—</td>
+                                        <td class="inv-g1">@string.Format("{0:N0}", itemSummary.Sum(s => s.OpeningStockAmount))</td>
+                                        <td class="inv-g2">@itemSummary.Sum(s => s.PurchaseQty).ToString("N3")</td>
+                                        <td class="inv-g2">—</td>
+                                        <td class="inv-g2">@string.Format("{0:N0}", itemSummary.Sum(s => s.PurchaseAmount))</td>
+                                        <td class="inv-g3">@itemSummary.Sum(s => s.TotalQty).ToString("N3")</td>
+                                        <td class="inv-g3">—</td>
+                                        <td class="inv-g3">@string.Format("{0:N0}", itemSummary.Sum(s => s.TotalQtyAmount))</td>
+                                        <td class="inv-g4">@itemSummary.Sum(s => s.SaleQty).ToString("N3")</td>
+                                        <td class="inv-g4">—</td>
+                                        <td class="inv-g4">@string.Format("{0:N0}", itemSummary.Sum(s => s.SaleAmount))</td>
+                                        <td class="inv-g5">@itemSummary.Sum(s => s.StockQty).ToString("N3")</td>
+                                        <td class="inv-g5">—</td>
+                                        <td class="inv-g5">@string.Format("{0:N0}", itemSummary.Sum(s => s.StockValue))</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Transaction Details</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive pl-outer">
+            <table class="table table-hover table-bordered mb-0" id="plReportTable">
+                <thead class="table-primary">
+                    <tr>
+                        <th class="fw-bold" style="font-size: 14px;">Date</th>
+                        <th class="fw-bold" style="font-size: 14px;">Transaction No</th>
+                        <th class="fw-bold" style="font-size: 14px;">Type</th>
+                        <th class="fw-bold" style="font-size: 14px;">Gari No</th>
+                        <th class="fw-bold" style="font-size: 14px;">Customer/Item</th>
+                        <th class="fw-bold" style="font-size: 14px;">Description</th>
+                        <th class="fw-bold" style="font-size: 14px;">Expense Head Details</th>
+                        <th class="text-end fw-bold" style="font-size: 14px;">Qty</th>
+                        <th class="text-end fw-bold" style="font-size: 14px;">Debit (Expense)</th>
+                        <th class="text-end fw-bold" style="font-size: 14px;">Credit (Revenue)</th>
+                        <th class="text-end fw-bold" style="font-size: 14px;">Running Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        decimal runningBalance = 0;
+                        decimal totalQty = 0;
+                        decimal tableDebit = 0;
+                        decimal tableCredit = 0;
+                        if (vouchers != null)
+                        {
+                            foreach (var voucher in vouchers.OrderBy(v => v.VoucherDate))
+                            {
+                                bool isSale     = voucher.VoucherType == ProjectManagement.Models.VoucherType.Sale;
+                                bool isPurchase = voucher.VoucherType == ProjectManagement.Models.VoucherType.Purchase;
+                                bool isExpense  = voucher.VoucherType == ProjectManagement.Models.VoucherType.Expense;
+
+                                if (!isSale && !isPurchase && !isExpense) continue;
+
+                                if (isSale)
+                                    runningBalance += voucher.Amount;
+                                else
+                                    runningBalance -= voucher.Amount;
+
+                                if (isSale)
+                                    tableCredit += voucher.Amount;
+                                else
+                                {
+                                    tableDebit += voucher.Amount;
+                                }
+
+                                if (voucher.Quantity.HasValue)
+                                    totalQty += voucher.Quantity.Value;
+
+                                <tr style="font-size: 13px;">
+                                    <td class="align-middle">@voucher.VoucherDate.ToPkShortDate()</td>
+                                    <td class="align-middle">
+                                        <a asp-controller="Vouchers" asp-action="Details" asp-route-id="@voucher.Id">
+                                            @voucher.TransactionNumber
+                                        </a>
+                                    </td>
+                                    <td class="align-middle">
+                                        <span class="badge bg-@(isSale ? "success" : isPurchase ? "warning text-dark" : "secondary")" style="font-size: 11px;">@voucher.VoucherType</span>
+                                    </td>
+                                    <td class="align-middle">@(string.IsNullOrWhiteSpace(voucher.GariNo) ? "-" : voucher.GariNo)</td>
+                                    <td class="align-middle">
+                                        @(voucher.PurchasingCustomer?.Name ?? voucher.ReceivingCustomer?.Name ?? "-")
+                                        @if (voucher.Item != null)
+                                        {
+                                            <br />
+                                            <small class="text-muted">@voucher.Item.Name</small>
+                                        }
+                                    </td>
+                                    <td class="align-middle">
+                                        @(voucher.Item?.Name ?? voucher.ExpenseHead?.Name ??
+                                        voucher.PurchasingCustomerDetails ?? voucher.ReceivingCustomerDetails ??
+                                        "Cash Transaction")
+                                    </td>
+                                    <td class="align-middle">
+                                        @if (isExpense && !string.IsNullOrWhiteSpace(voucher.ExpenseHeadDetails))
+                                        {
+                                            <span>@voucher.ExpenseHeadDetails</span>
+                                        }
+                                        else
+                                        {
+                                            <span>-</span>
+                                        }
+                                    </td>
+                                    <td class="text-end align-middle fw-semibold">
+                                        @(voucher.Quantity.HasValue ? voucher.Quantity.Value.ToString("N3") : "-")
+                                    </td>
+                                    <td class="text-end align-middle @(!isSale ? "text-danger fw-semibold" : "")">
+                                        @if (!isSale)
+                                        {
+                                            <span>@string.Format("{0:N0}", voucher.Amount)</span>
+                                        }
+                                        else
+                                        {
+                                            <span>-</span>
+                                        }
+                                    </td>
+                                    <td class="text-end align-middle @(isSale ? "text-success fw-semibold" : "")">
+                                        @if (isSale)
+                                        {
+                                            <span>@string.Format("{0:N0}", voucher.Amount)</span>
+                                        }
+                                        else
+                                        {
+                                            <span>-</span>
+                                        }
+                                    </td>
+                                    <td class="text-end align-middle fw-bold @(runningBalance >= 0 ? "text-success" : "text-danger")">
+                                        @string.Format("{0:N0}", Math.Abs(runningBalance))
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    }
+                </tbody>
+                <tfoot class="table-success">
+                    <tr style="font-size: 15px;">
+                        <th class="fw-bold py-3">TOTAL:</th>
+                        <th></th>
+                        <th></th>
+                        <th></th>
+                        <th></th>
+                        <th></th>
+                        <th></th>
+                        <th class="text-end fw-bold py-3">@totalQty.ToString("N3")</th>
+                        <th class="text-end text-danger fw-bold py-3">Rs. @string.Format("{0:N0}", tableDebit)</th>
+                        <th class="text-end text-success fw-bold py-3">Rs. @string.Format("{0:N0}", tableCredit)</th>
+                        <th class="text-end fw-bold py-3 @(runningBalance >= 0 ? "text-success" : "text-danger")">Rs. @string.Format("{0:N0}", Math.Abs(runningBalance))</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3 d-print-none">
+    <button onclick="window.print()" class="btn btn-primary">
+        <i class="bi bi-printer"></i> Print Report
+    </button>
+    <button onclick="exportTableToExcel('plReportTable', 'ProfitLoss_@project?.Name')" class="btn btn-success">
+        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+    </button>
+    <a asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Reports
+    </a>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // No DataTables vertical scroll (scrollY): that splits the header/body/footer into
+            // separate tables and causes column misalignment. We render as one table and make
+            // the scrollable 420px area + sticky header via CSS on the .table-responsive wrapper.
+            var dt = $('#plReportTable').DataTable({
+                "order": [[0, "asc"]],
+                "pageLength": 50,
+                "autoWidth": false,
+                "dom": '<"dt-top d-flex justify-content-between align-items-center mb-2"Bf>t<"dt-bottom d-flex justify-content-between align-items-center pt-2 border-top"ip>',
+                "buttons": ['copy', 'csv', 'excel', 'pdf', 'print']
+            });
+
+            // Wrap ONLY the table in its own scroll box so the search bar and pagination
+            // stay outside the scroll area. The header/footer are sticky inside this box,
+            // and because it's a single table the columns stay perfectly aligned.
+            $('#plReportTable').wrap('<div class="pl-scroll"></div>');
+
+            // Keep the table at full width on page/search changes
+            function fixWidth() {
+                $('#plReportTable').css('width', '100%');
+                dt.columns.adjust();
+            }
+            fixWidth();
+            dt.on('draw', fixWidth);
+            $(window).on('resize', fixWidth);
+
+            // Function to calculate and update totals based on filtered rows
+            function updateTotalsForVisibleRows() {
+                var totalQty = 0;
+                var totalDebit = 0;
+                var totalCredit = 0;
+
+                // Get all visible rows from DataTable
+                dt.rows({search: 'applied'}).every(function() {
+                    var cells = this.node().querySelectorAll('td');
+                    var qtyCell = cells[6].textContent.trim();
+                    var debitCell = cells[7].textContent.trim();
+                    var creditCell = cells[8].textContent.trim();
+
+                    // Parse values
+                    var qty = parseFloat(qtyCell.replace(/,/g, '')) || 0;
+                    var debit = parseFloat(debitCell.replace(/[^\d.]/g, '')) || 0;
+                    var credit = parseFloat(creditCell.replace(/[^\d.]/g, '')) || 0;
+
+                    totalQty += qty;
+                    totalDebit += debit;
+                    totalCredit += credit;
+                });
+
+                // Update footer totals
+                var footerRow = $('#plReportTable tfoot tr');
+                footerRow.find('th:eq(6)').text(totalQty.toFixed(3));
+                footerRow.find('th:eq(7)').text('Rs. ' + totalDebit.toLocaleString('en-PK', {maximumFractionDigits: 0}));
+                footerRow.find('th:eq(8)').text('Rs. ' + totalCredit.toLocaleString('en-PK', {maximumFractionDigits: 0}));
+
+                // Calculate and update running balance
+                var runningBalance = totalCredit - totalDebit;
+                var balanceClass = runningBalance >= 0 ? 'text-success' : 'text-danger';
+                footerRow.find('th:eq(9)')
+                    .text('Rs. ' + Math.abs(runningBalance).toLocaleString('en-PK', {maximumFractionDigits: 0}))
+                    .removeClass('text-success text-danger')
+                    .addClass(balanceClass);
+            }
+
+            // Update totals when DataTable search is applied
+            dt.on('draw', function() {
+                updateTotalsForVisibleRows();
+            });
+        });
+
+        function exportTableToExcel(tableID, filename = ''){
+            var downloadLink;
+            var dataType = 'application/vnd.ms-excel';
+            var tableSelect = document.getElementById(tableID);
+            var tableHTML = tableSelect.outerHTML.replace(/ /g, '%20');
+
+            filename = filename?filename+'.xls':'excel_data.xls';
+            downloadLink = document.createElement("a");
+            document.body.appendChild(downloadLink);
+
+            if(navigator.msSaveOrOpenBlob){
+                var blob = new Blob(['\ufeff', tableHTML], {
+                    type: dataType
+                });
+                navigator.msSaveOrOpenBlob( blob, filename);
+            }else{
+                downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
+                downloadLink.download = filename;
+                downloadLink.click();
+            }
+        }
+    </script>
+
+    <style>
+        /* ── Transaction Details DataTable ── */
+
+        #plReportTable_wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Outer Bootstrap wrapper must not add its own scroll/clip — that would break
+           the sticky header inside .pl-scroll. */
+        .pl-outer {
+            overflow: visible;
+        }
+
+        /* Single-table scroll: a div wrapping ONLY the table scrolls, so the header,
+           body, and footer are one table and columns stay perfectly aligned. */
+        #plReportTable_wrapper .pl-scroll {
+            max-height: 520px;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        #plReportTable { width: 100% !important; }
+
+        /* Sticky header (replaces the DataTables scroll-header feature) */
+        #plReportTable thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background-color: #cfe2ff !important;
+            border-bottom: 2px solid #0d6efd;
+            padding: 10px 8px;
+            white-space: nowrap;
+        }
+
+        /* Sticky footer (totals) row pinned to the bottom of the scroll area */
+        #plReportTable tfoot th {
+            position: sticky;
+            bottom: 0;
+            z-index: 2;
+            background-color: #d1e7dd !important;
+            border-top: 2px solid #198754;
+            padding: 10px 8px;
+            white-space: nowrap;
+        }
+
+        #plReportTable tbody tr:hover td { background-color: #f0f4ff; }
+
+        /* Search box */
+        #plReportTable_wrapper .dt-top {
+            padding: 8px 4px 4px 4px;
+        }
+
+        /* Info + pagination bar — pinned */
+        #plReportTable_wrapper .dt-bottom {
+            padding: 6px 4px;
+            background: #fff;
+        }
+
+        /* Scrollbar */
+        #plReportTable_wrapper .pl-scroll::-webkit-scrollbar { width: 7px; height: 7px; }
+        #plReportTable_wrapper .pl-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        #plReportTable_wrapper .pl-scroll::-webkit-scrollbar-thumb { background: #aaa; border-radius: 4px; }
+        #plReportTable_wrapper .pl-scroll::-webkit-scrollbar-thumb:hover { background: #666; }
+
+        /* ── Inventory Table ── */
+        #inventoryTable { border-collapse: separate; border-spacing: 0; }
+
+        /* Item name column */
+        .inv-item-col { min-width: 130px; background: #f8f9fa; }
+
+        /* Group header row 1 colors */
+        th.inv-g1 { background: #495057; }
+        th.inv-g2 { background: #0d6efd; }
+        th.inv-g3 { background: #0a58ca; }
+        th.inv-g4 { background: #dc3545; }
+        th.inv-g5 { background: #198754; }
+
+        /* Sub-header row 2 — slightly lighter */
+        th.inv-sub.inv-g1 { background: #6c757d; color:#fff; }
+        th.inv-sub.inv-g2 { background: #3d8bfd; color:#fff; }
+        th.inv-sub.inv-g3 { background: #3d71cc; color:#fff; }
+        th.inv-sub.inv-g4 { background: #e35d6a; color:#fff; }
+        th.inv-sub.inv-g5 { background: #28a745; color:#fff; }
+
+        /* Body cells — tinted background per group */
+        td.inv-g1 { background: #f8f9fa; }
+        td.inv-g2 { background: #e9f0ff; }
+        td.inv-g3 { background: #dce8ff; }
+        td.inv-g4 { background: #fff0f1; }
+        td.inv-g5 { background: #e6f4ea; }
+
+        /* Thick left border at each group boundary */
+        th.inv-g1, td.inv-g1 { border-left: 3px solid #495057 !important; }
+        th.inv-g2, td.inv-g2 { border-left: 3px solid #0d6efd !important; }
+        th.inv-g3, td.inv-g3 { border-left: 3px solid #0a58ca !important; }
+        th.inv-g4, td.inv-g4 { border-left: 3px solid #dc3545 !important; }
+        th.inv-g5, td.inv-g5 { border-left: 3px solid #198754 !important; }
+
+        /* Only the first cell of each group gets the thick border */
+        th.inv-g1 ~ th.inv-g1, td.inv-g1 ~ td.inv-g1,
+        th.inv-g2 ~ th.inv-g2, td.inv-g2 ~ td.inv-g2,
+        th.inv-g3 ~ th.inv-g3, td.inv-g3 ~ td.inv-g3,
+        th.inv-g4 ~ th.inv-g4, td.inv-g4 ~ td.inv-g4,
+        th.inv-g5 ~ th.inv-g5, td.inv-g5 ~ td.inv-g5 { border-left: 1px solid #dee2e6 !important; }
+
+        /* Sticky header rows */
+        #inventoryTable thead tr:first-child th { position: sticky; top: 0; z-index: 11; }
+        #inventoryTable thead tr:last-child  th { position: sticky; top: 35px; z-index: 10; }
+
+        /* Cell padding */
+        #inventoryTable th, #inventoryTable td { padding: 5px 7px; white-space: nowrap; }
+
+        #inventoryTable .inv-row:hover td { filter: brightness(0.93); }
+
+        /* Footer row: force dark background on all cells */
+        #inventoryTable tfoot td {
+            background: #1a1a2e !important;
+            color: #fff !important;
+        }
+
+        @@media print {
+            .card {
+                page-break-inside: avoid;
+            }
+
+            .table {
+                font-size: 10pt;
+            }
+
+            .table-responsive,
+            #plReportTable_wrapper .pl-scroll {
+                max-height: none;
+                overflow: visible;
+            }
+
+            #plReportTable thead th,
+            #plReportTable tfoot th {
+                position: relative;
+            }
+        }
+    </style>
+}

@@ -1,0 +1,406 @@
+﻿@inject ProjectManagement.Services.SiteSettingsService SiteSettings
+@{
+    ViewData["Title"] = "Advanced Payment Report";
+    var site = SiteSettings.Get();
+    var customer = ViewBag.Customer as ProjectManagement.Models.Customer;
+    var vouchers = ViewBag.Vouchers as List<ProjectManagement.Models.Voucher>;
+    var displayFromDate = ViewBag.FromDate != null ? ((DateTime)ViewBag.FromDate).ToString("yyyy-MM-dd") : DateTime.Today.AddDays(-90).ToString("yyyy-MM-dd");
+    var displayToDate = ViewBag.ToDate != null ? ((DateTime)ViewBag.ToDate).ToString("yyyy-MM-dd") : DateTime.Today.ToString("yyyy-MM-dd");
+}
+
+<div class="d-print-none">
+    <h2><i class="bi bi-cash-coin text-success"></i> Advanced Payment Report</h2>
+</div>
+
+@if (customer == null)
+{
+    <div class="card mb-3">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-funnel"></i> Select Customer</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Customer <span class="text-danger">*</span></label>
+                    @Html.DropDownList("customerId", ViewBag.Customers as SelectList, "Select Customer", new { @class = "form-select select2", required = "required" })
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">From Date</label>
+                    <input type="date" name="fromDate" class="form-control" value="@displayFromDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">To Date</label>
+                    <input type="date" name="toDate" class="form-control" value="@displayToDate" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-search"></i> Generate
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    var openingBalance = (decimal)ViewBag.OpeningBalance;
+    var totalReceived = (decimal)ViewBag.TotalReceived;
+    var totalPaid = (decimal)ViewBag.TotalPaid;
+    var closingBalance = (decimal)ViewBag.ClosingBalance;
+    var fromDate = (DateTime)ViewBag.FromDate;
+    var toDate = (DateTime)ViewBag.ToDate;
+
+    <!-- Filter Form -->
+    <div class="card mb-3 d-print-none">
+        <div class="card-header bg-success text-white">
+            <h6 class="mb-0"><i class="bi bi-funnel"></i> Filter</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Customer</label>
+                    @Html.DropDownList("customerId", ViewBag.Customers as SelectList, "Select Customer", new { @class = "form-select" })
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">From Date</label>
+                    <input type="date" name="fromDate" value="@fromDate.ToString("yyyy-MM-dd")" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">To Date</label>
+                    <input type="date" name="toDate" value="@toDate.ToString("yyyy-MM-dd")" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-search"></i> Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Customer Banner -->
+    <div class="card mb-3 shadow-sm border-0" style="background: linear-gradient(135deg, #198754 0%, #146c43 100%);">
+        <div class="card-body py-3 px-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-white d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:56px; height:56px;">
+                    <i class="bi bi-person-fill text-success" style="font-size:1.8rem;"></i>
+                </div>
+                <div>
+                    <h3 class="text-white fw-bold mb-0">@customer.Name</h3>
+                    <small class="text-white opacity-75">
+                        @if (!string.IsNullOrEmpty(customer.Phone)) { <span><i class="bi bi-telephone me-1"></i>@customer.Phone</span> }
+                    </small>
+                </div>
+                <div class="ms-auto text-white text-end opacity-75">
+                    <small><i class="bi bi-calendar-range me-1"></i>@fromDate.ToString("dd-MMM-yyyy") to @toDate.ToString("dd-MMM-yyyy")</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Balance Cards -->
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <div class="card border-secondary shadow-sm h-100">
+                <div class="card-body bg-light text-center">
+                    <h6 class="text-muted mb-2 fw-bold"><i class="bi bi-arrow-up-circle"></i> Opening Balance</h6>
+                    <h3 class="fw-bold mb-0 @(openingBalance >= 0 ? "text-success" : "text-danger")">
+                        @(openingBalance < 0 ? "-" : "+")Rs. @string.Format("{0:N0}", Math.Abs(openingBalance))
+                    </h3>
+                    <small class="text-muted">@(openingBalance >= 0 ? "We hold customer's advance" : "We owe customer")</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-danger shadow-sm h-100">
+                <div class="card-body bg-light text-center">
+                    <h6 class="text-muted mb-2 fw-bold"><i class="bi bi-arrow-down-circle text-danger"></i> Total Received</h6>
+                    <h3 class="fw-bold text-danger mb-0">- Rs. @string.Format("{0:N0}", totalReceived)</h3>
+                    <small class="text-muted">We received â€” we owe this to customer</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success shadow-sm h-100">
+                <div class="card-body bg-light text-center">
+                    <h6 class="text-muted mb-2 fw-bold"><i class="bi bi-arrow-up-circle text-success"></i> Total Paid</h6>
+                    <h3 class="fw-bold text-success mb-0">+ Rs. @string.Format("{0:N0}", totalPaid)</h3>
+                    <small class="text-muted">We paid â€” customer owes us</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Closing Balance -->
+    <div class="card mb-3 shadow-sm border-@(closingBalance >= 0 ? "success" : "danger")">
+        <div class="card-body text-center py-3">
+            <h5 class="fw-bold text-muted mb-1">Closing Balance (as of @toDate.ToString("dd-MMM-yyyy"))</h5>
+            <h2 class="fw-bold mb-1 @(closingBalance >= 0 ? "text-success" : "text-danger")">
+                @(closingBalance < 0 ? "-" : "+")Rs. @string.Format("{0:N0}", Math.Abs(closingBalance))
+            </h2>
+            <span class="badge bg-@(closingBalance >= 0 ? "success" : "danger") fs-6">
+                @(closingBalance >= 0 ? "Customer owes us this amount" : "We owe this amount to customer")
+            </span>
+        </div>
+    </div>
+
+    <!-- Transactions Table -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Advanced Payment Transactions</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered mb-0" id="advancedTable">
+                    <thead class="table-success">
+                        <tr>
+                            <th style="font-size:14px;">Date</th>
+                            <th style="font-size:14px;">Transaction No.</th>
+                            <th style="font-size:14px;">Type</th>
+                            <th style="font-size:14px;">Details</th>
+                            <th class="text-end" style="font-size:14px;">Received (-)</th>
+                            <th class="text-end" style="font-size:14px;">Paid (+)</th>
+                            <th class="text-end" style="font-size:14px;">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Opening Balance Row -->
+                        <tr class="table-warning">
+                            <td class="fw-semibold">@fromDate.ToString("dd-MMM-yyyy")</td>
+                            <td colspan="3" class="fw-bold">Opening Balance</td>
+                            <td class="text-end fw-semibold">@(openingBalance > 0 ? string.Format("{0:N0}", openingBalance) : "-")</td>
+                            <td class="text-end fw-semibold">@(openingBalance < 0 ? string.Format("{0:N0}", Math.Abs(openingBalance)) : "-")</td>
+                            <td class="text-end fw-bold @(openingBalance >= 0 ? "text-success" : "text-danger")">
+                                @(openingBalance < 0 ? "-" : "+")Rs. @string.Format("{0:N0}", Math.Abs(openingBalance))
+                            </td>
+                        </tr>
+
+                        @if (vouchers != null && vouchers.Any())
+                        {
+                            decimal runningBalance = openingBalance;
+                            foreach (var v in vouchers)
+                            {
+                                bool isReceived = (v.VoucherType == ProjectManagement.Models.VoucherType.AdvancedCashReceived
+                                                       && v.AdvancedReceivingCustomerId == customer.Id)
+                                                  || (v.VoucherType == ProjectManagement.Models.VoucherType.AdvancedPayment
+                                                       && v.ReceivingCustomerId == customer.Id);
+                                bool isPaid = v.VoucherType == ProjectManagement.Models.VoucherType.AdvancedCashPaid
+                                              && v.AdvancedPurchasingCustomerId == customer.Id;
+
+                                if (isReceived) runningBalance -= v.Amount;
+                                else if (isPaid) runningBalance += v.Amount;
+
+                                string typeLabel = v.VoucherType switch {
+                                    ProjectManagement.Models.VoucherType.AdvancedCashReceived => "Adv. Cash Received",
+                                    ProjectManagement.Models.VoucherType.AdvancedCashPaid => "Adv. Cash Paid",
+                                    ProjectManagement.Models.VoucherType.AdvancedPayment => "Advanced Payment",
+                                    _ => v.VoucherType.ToString()
+                                };
+
+                                string typeBadge = v.VoucherType == ProjectManagement.Models.VoucherType.AdvancedCashPaid ? "danger" : "success";
+                                string details = v.AdvancedReceivingCustomerDetails ?? v.AdvancedPurchasingCustomerDetails ?? v.ReceivingCustomerDetails ?? "";
+
+                                <tr style="font-size:13px;">
+                                    <td class="align-middle">@v.VoucherDate.ToPkDate()</td>
+                                    <td class="align-middle">
+                                        <a asp-controller="Vouchers" asp-action="Details" asp-route-id="@v.Id">
+                                            @v.TransactionNumber
+                                        </a>
+                                    </td>
+                                    <td class="align-middle">
+                                        <span class="badge bg-@typeBadge" style="font-size:11px;">@typeLabel</span>
+                                    </td>
+                                    <td class="align-middle">@details</td>
+                                    <td class="text-end align-middle text-danger fw-semibold">
+                                        @(isReceived ? "- " + string.Format("{0:N0}", v.Amount) : "-")
+                                    </td>
+                                    <td class="text-end align-middle text-success fw-semibold">
+                                        @(isPaid ? "+ " + string.Format("{0:N0}", v.Amount) : "-")
+                                    </td>
+                                    <td class="text-end align-middle fw-bold @(runningBalance >= 0 ? "text-success" : "text-danger")">
+                                        @(runningBalance < 0 ? "-" : "+")Rs. @string.Format("{0:N0}", Math.Abs(runningBalance))
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4 fst-italic">
+                                    <i class="bi bi-info-circle"></i> No advanced payment transactions found for this period.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-dark">
+                        <tr style="font-size:15px;">
+                            <th colspan="4" class="fw-bold py-3">PERIOD TOTAL:</th>
+                            <th class="text-end text-danger fw-bold py-3">- Rs. @string.Format("{0:N0}", totalReceived)</th>
+                            <th class="text-end text-success fw-bold py-3">+ Rs. @string.Format("{0:N0}", totalPaid)</th>
+                            <th class="text-end fw-bold py-3 @(closingBalance >= 0 ? "text-success" : "text-danger")">
+                                @(closingBalance >= 0 ? "+" : "-")Rs. @string.Format("{0:N0}", Math.Abs(closingBalance))
+                            </th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="mt-3 d-print-none">
+        <a asp-controller="Vouchers" asp-action="AdvancedCashReceived" class="btn btn-success">
+            <i class="bi bi-cash-coin"></i> Record Advance Received
+        </a>
+        <a asp-controller="Vouchers" asp-action="AdvancedCashPaid" class="btn btn-danger">
+            <i class="bi bi-cash-stack"></i> Record Advance Paid
+        </a>
+        <button onclick="window.print()" class="btn btn-primary">
+            <i class="bi bi-printer"></i> Print
+        </button>
+        <button onclick="generatePDF()" class="btn btn-danger" data-customer-name="@customer.Name">
+            <i class="bi bi-file-pdf"></i> Generate PDF
+        </button>
+        <a asp-action="CustomerLedger" asp-route-customerId="@customer.Id"
+           asp-route-fromDate="@fromDate.ToString("yyyy-MM-dd")"
+           asp-route-toDate="@toDate.ToString("yyyy-MM-dd")" class="btn btn-info">
+            <i class="bi bi-person-lines-fill"></i> Customer Ledger
+        </a>
+        <a asp-action="Index" class="btn btn-secondary">
+            <i class="bi bi-house"></i> Back to Reports
+        </a>
+    </div>
+
+    <style>
+        @@media print {
+            .table-responsive { max-height: none; overflow: visible; }
+            .table { font-size: 10pt; }
+        }
+    </style>
+}
+
+@section Scripts {
+    <!-- html2pdf.js CDN (screenshot-style PDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        // Site branding for the PDF footer (set in Theme Settings, saved to sitesettings.json)
+        var SITE = {
+            name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.SiteName)),
+            showDev: @(site.ShowDeveloperInfo ? "true" : "false"),
+            devName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.DeveloperName)),
+            devContact: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(site.DeveloperContact))
+        };
+
+        // Builds the site-name + (optional) developer footer block appended to the
+        // bottom of the cloned report so it appears in the screenshot-style PDF.
+        function buildSiteFooter() {
+            var wrap = document.createElement('div');
+            wrap.style.cssText = 'margin-top:14px;padding-top:8px;border-top:1px solid #999;text-align:center;font-family:Arial,sans-serif;';
+
+            var line1 = document.createElement('div');
+            line1.style.cssText = 'font-size:11px;color:#333;font-weight:600;';
+            line1.textContent = 'This report was generated by ' + SITE.name + ' Management System';
+            wrap.appendChild(line1);
+
+            if (SITE.showDev) {
+                var line2 = document.createElement('div');
+                line2.style.cssText = 'font-size:10px;color:#666;margin-top:3px;';
+                line2.textContent = 'Software developed by ' + SITE.devName + ' â€” Contact: ' + SITE.devContact + ' for the management software';
+                wrap.appendChild(line2);
+            }
+            return wrap;
+        }
+
+        $(document).ready(function() {
+            if ($('.select2').length) {
+                $('.select2').select2({ theme: 'bootstrap-5', width: '100%' });
+            }
+        });
+
+        // Builds a clean clone of just the report, expanded so html2pdf captures every
+        // row and column, with the site footer appended at the bottom.
+        function buildPdfElement() {
+            const element = document.querySelector('body').cloneNode(true);
+            element.style.display = 'block';
+            element.style.height = 'auto';
+
+            element.querySelectorAll('header, footer, .modal, .d-print-none')
+                   .forEach(el => el.remove());
+
+            element.querySelectorAll('.table-responsive').forEach(function(el) {
+                el.style.maxHeight = 'none';
+                el.style.overflow = 'visible';
+                el.style.overflowX = 'visible';
+                el.style.overflowY = 'visible';
+            });
+
+            element.querySelectorAll('#advancedTable thead').forEach(t => t.style.display = 'table-header-group');
+            element.querySelectorAll('#advancedTable thead th').forEach(th => th.style.position = 'static');
+            element.querySelectorAll('#advancedTable tfoot').forEach(t => t.style.display = 'table-footer-group');
+
+            // Columns: Date, Txn No, Type, Details, Received, Paid, Balance
+            const colWidths = ['12%', '15%', '15%', '24%', '12%', '10%', '12%'];
+            element.querySelectorAll('#advancedTable').forEach(function(tbl) {
+                tbl.style.width = '100%';
+                tbl.style.tableLayout = 'fixed';
+                const existing = tbl.querySelector('colgroup');
+                if (existing) existing.remove();
+                const colgroup = document.createElement('colgroup');
+                colWidths.forEach(function(w) {
+                    const col = document.createElement('col');
+                    col.style.width = w;
+                    colgroup.appendChild(col);
+                });
+                tbl.insertBefore(colgroup, tbl.firstChild);
+            });
+            element.querySelectorAll('#advancedTable th, #advancedTable td').forEach(function(cell) {
+                cell.style.wordBreak = 'break-word';
+                cell.style.whiteSpace = 'normal';
+                cell.style.overflowWrap = 'anywhere';
+                cell.style.fontSize = '11px';
+                cell.style.padding = '4px 5px';
+                cell.style.verticalAlign = 'middle';
+            });
+
+            var main = element.querySelector('main') || element.querySelector('.container-fluid') || element;
+            main.appendChild(buildSiteFooter());
+
+            return element;
+        }
+
+        // Generate the screenshot-style PDF (all rows + columns), with the site footer.
+        function generatePDF() {
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating PDF...';
+            button.disabled = true;
+
+            const customerName = button.getAttribute('data-customer-name') || 'Customer';
+            const timestamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
+            const filename = 'AdvancedPaymentReport_' + customerName.replace(/\s+/g, '_') + '_' + timestamp + '.pdf';
+
+            const element = buildPdfElement();
+            const opt = {
+                margin: [10, 10, 10, 10],
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0, windowHeight: element.scrollHeight },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(function() {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }).catch(function(error) {
+                console.error('PDF generation error:', error);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+    </script>
+}
+

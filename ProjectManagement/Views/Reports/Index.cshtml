@@ -1,0 +1,615 @@
+@* Views/Reports/Index.cshtml *@
+@{
+    ViewData["Title"] = "Reports";
+    var globalFromDate = ViewBag.GlobalFromDate != null ? ((DateTime)ViewBag.GlobalFromDate).ToString("yyyy-MM-dd") : DateTime.Now.AddMonths(-1).ToString("yyyy-MM-dd");
+    var globalToDate = ViewBag.GlobalToDate != null ? ((DateTime)ViewBag.GlobalToDate).ToString("yyyy-MM-dd") : DateTime.Now.ToString("yyyy-MM-dd");
+}
+
+<!-- Global Date Filter -->
+<div class="card mb-4 border-0 shadow-sm global-filter-card">
+    <div class="card-body p-4">
+        <div class="d-flex align-items-center mb-3">
+            <div class="global-filter-icon me-3">
+                <i class="bi bi-calendar-range"></i>
+            </div>
+            <div>
+                <h5 class="mb-0 fw-bold text-white">Global Date Filter</h5>
+                <small class="text-white-50">Applied automatically to every report below</small>
+            </div>
+        </div>
+
+        <!-- Quick presets -->
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="btn btn-sm preset-btn" data-preset="today">Today</button>
+            <button type="button" class="btn btn-sm preset-btn" data-preset="week">Last 7 Days</button>
+            <button type="button" class="btn btn-sm preset-btn" data-preset="month">This Month</button>
+            <button type="button" class="btn btn-sm preset-btn" data-preset="last30">Last 30 Days</button>
+            <button type="button" class="btn btn-sm preset-btn" data-preset="year">This Year</button>
+        </div>
+
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3 col-6">
+                <label class="form-label fw-semibold text-white-50 small text-uppercase">From Date</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-0"><i class="bi bi-calendar-event text-primary"></i></span>
+                    <input type="date" id="globalFromDate" class="form-control border-0" value="@globalFromDate" />
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label fw-semibold text-white-50 small text-uppercase">To Date</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-0"><i class="bi bi-calendar-check text-primary"></i></span>
+                    <input type="date" id="globalToDate" class="form-control border-0" value="@globalToDate" />
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <button type="button" id="applyGlobalDates" class="btn btn-light fw-semibold w-100 shadow-sm">
+                    <i class="bi bi-check-circle-fill text-success"></i> Apply Dates
+                </button>
+            </div>
+            <div class="col-md-3 col-6">
+                <button type="button" id="resetGlobalDates" class="btn btn-outline-light fw-semibold w-100">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Access Cards -->
+<div class="row mb-4 mt-4 row-cols-2 row-cols-lg-5 g-3">
+    <div class="col">
+        <a asp-action="AllCustomersReport" class="text-decoration-none">
+            <div class="card bg-primary h-100 dashboard-card">
+                <div class="card-body text-center text-white">
+                    <i class="bi bi-people fs-1 text-white"></i>
+                    <h5 class="mt-2 text-white">All Customers</h5>
+                    <small class="text-white" style="opacity: 1 !important;">Receivables & Payables</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col">
+        <a href="#" onclick="navigateWithGlobalDates('AllProjectsReport')" class="text-decoration-none">
+            <div class="card bg-info h-100 dashboard-card">
+                <div class="card-body text-center text-white">
+                    <i class="bi bi-diagram-3 fs-1 text-white"></i>
+                    <h5 class="mt-2 text-white">All Projects</h5>
+                    <small class="text-white" style="opacity: 1 !important;">Projects Overview</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col">
+        <a asp-action="AllExpensesReport" class="text-decoration-none">
+            <div class="card bg-danger h-100 dashboard-card">
+                <div class="card-body text-center text-white">
+                    <i class="bi bi-receipt fs-1 text-white"></i>
+                    <h5 class="mt-2 text-white">All Expenses</h5>
+                    <small class="text-white" style="opacity: 1 !important;">Expense Summary</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col">
+        <a asp-action="ExpenseReport" class="text-decoration-none">
+            <div class="card bg-danger h-100 dashboard-card">
+                <div class="card-body text-center text-white">
+                    <i class="bi bi-wallet2 fs-1 text-white"></i>
+                    <h5 class="mt-2 text-white">Expense Report</h5>
+                    <small class="text-white" style="opacity: 1 !important;">Detailed Expense Analysis</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col">
+        <a asp-action="HazriReport" class="text-decoration-none">
+            <div class="card bg-warning h-100 dashboard-card">
+                <div class="card-body text-center text-dark">
+                    <i class="bi bi-people-fill fs-1 text-dark"></i>
+                    <h5 class="mt-2 text-dark">Hazri Report</h5>
+                    <small class="text-dark" style="opacity: 1 !important;">Attendance & Labor Payments</small>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- First Row: 5 Main Reports -->
+<div class="row row-cols-2 row-cols-lg-5 g-3 mb-4">
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header bg-primary text-white">
+                <h5><i class="bi bi-bar-chart"></i> Project Profit & Loss Report</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Generate profit and loss statements for your projects.</p>
+                <form asp-action="ProfitLoss" method="post">
+                    <input type="hidden" name="fromDate" class="profit-loss-from-date" value="@globalFromDate" />
+                    <input type="hidden" name="toDate" class="profit-loss-to-date" value="@globalToDate" />
+                    <div class="mb-3">
+                        <label class="form-label">Select Project <span class="text-danger">*</span></label>
+                        @if (ViewBag.Projects != null)
+                        {
+                            @Html.DropDownList("projectId", ViewBag.Projects as SelectList, "-- Select Project --", new { @class = "form-select", required = "required" })
+                        }
+                        else
+                        {
+                            <select class="form-select" disabled>
+                                <option>No projects available</option>
+                            </select>
+                        }
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-file-earmark-text"></i> Generate P&L Report
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header bg-success text-white">
+                <h5><i class="bi bi-bank"></i> Bank Statement</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">View detailed bank transaction statements.</p>
+                <form asp-action="BankStatement" method="get">
+                    <input type="hidden" name="fromDate" class="bank-statement-from-date" value="@globalFromDate" />
+                    <input type="hidden" name="toDate" class="bank-statement-to-date" value="@globalToDate" />
+                    <div class="mb-3">
+                        <label class="form-label">Select Bank <span class="text-danger">*</span></label>
+                        @if (ViewBag.Banks != null)
+                        {
+                            @Html.DropDownList("bankId", ViewBag.Banks as SelectList, "-- Select Bank --", new { @class = "form-select", required = "required" })
+                        }
+                        else
+                        {
+                            <select class="form-select" disabled>
+                                <option>No banks available</option>
+                            </select>
+                        }
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-file-earmark-text"></i> Generate Bank Statement
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header bg-success text-white">
+                <h5><i class="bi bi-cash-stack"></i> Cash Flow</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">View cash in and cash out transactions for the selected period.</p>
+                <form asp-action="CashFlow" method="get">
+                    <input type="hidden" name="fromDate" class="cash-flow-from-date" value="@globalFromDate" />
+                    <input type="hidden" name="toDate" class="cash-flow-to-date" value="@globalToDate" />
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-file-earmark-text"></i> View Cash Flow
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header bg-info text-white">
+                <h5><i class="bi bi-box-seam"></i> Stock Report</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">View stock levels and inventory valuation for the selected period.</p>
+                <form asp-action="StockReport" method="get">
+                    <input type="hidden" name="fromDate" class="stock-report-from-date" value="@globalFromDate" />
+                    <input type="hidden" name="toDate" class="stock-report-to-date" value="@globalToDate" />
+                    <button type="submit" class="btn btn-info w-100">
+                        <i class="bi bi-file-earmark-text"></i> View Stock Report
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header bg-primary text-white">
+                <h5><i class="bi bi-box-arrow-in-down"></i> Stock Track Report</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Track which customer purchased/sold items and when.</p>
+                <form asp-action="StockTrackReport" method="get">
+                    <input type="hidden" name="fromDate" class="stock-track-report-from-date" value="@globalFromDate" />
+                    <input type="hidden" name="toDate" class="stock-track-report-to-date" value="@globalToDate" />
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-file-earmark-text"></i> View Stock Track Report
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Second Row: 5 Additional Reports -->
+<div class="row row-cols-2 row-cols-lg-5 g-3 mb-4">
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header text-white" style="background:#0f5132;">
+                <h5><i class="bi bi-journal-text"></i> کھاتا فروخت (Khata Report Sale)</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">اردو فارمیٹ میں کسٹمر کا فروخت کھاتا - PDF کے قابل</p>
+                <a href="#" onclick="navigateWithGlobalDates('KhataReportSale')" class="btn w-100 text-white" style="background:#0f5132;">
+                    <i class="bi bi-file-earmark-pdf"></i> کھاتا فروخت رپورٹ دیکھیں
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header text-white" style="background:#1a1a2e;">
+                <h5><i class="bi bi-journal-text"></i> کھاتا تفصیل (Urdu Khata)</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">اردو فارمیٹ میں کسٹمر کا مکمل کھاتا - PDF کے قابل</p>
+                <a href="#" onclick="navigateWithGlobalDates('KhataReport')" class="btn w-100 text-white" style="background:#1a1a2e;">
+                    <i class="bi bi-file-earmark-pdf"></i> کھاتا رپورٹ دیکھیں
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header bg-danger text-white">
+                <h5><i class="bi bi-person-lines-fill"></i> Customer Ledger</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">View detailed customer account statements and transaction history.</p>
+                <a href="#" onclick="navigateWithGlobalDates('CustomerLedger')" class="btn btn-danger w-100">
+                    <i class="bi bi-file-earmark-text"></i> View Customer Ledger
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header bg-success text-white">
+                <h5><i class="bi bi-cash-coin"></i> Advanced Payment Report</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">View advanced payments received from and paid to customers.</p>
+                <a href="#" onclick="navigateWithGlobalDates('AdvancedPaymentReport')" class="btn btn-success w-100">
+                    <i class="bi bi-file-earmark-text"></i> View Advanced Payment Report
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header bg-warning text-dark">
+                <h5><i class="bi bi-journal-text"></i> Daily Cash Book</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Daily cash transactions and cash book tracking.</p>
+                <form asp-action="DailyCashBook" method="get">
+                    <input type="hidden" name="fromDate" class="daily-cashbook-from-date" value="@globalFromDate" />
+                    <input type="hidden" name="toDate" class="daily-cashbook-to-date" value="@globalToDate" />
+                    <button type="submit" class="btn btn-warning w-100">
+                        <i class="bi bi-file-earmark-text"></i> View Daily Cash Book
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header bg-dark text-white">
+                <h5><i class="bi bi-clock-history"></i> Activity Log</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">View all entries added, edited, or updated by date (system change history).</p>
+                <a asp-action="ActivityLog" class="btn btn-dark w-100">
+                    <i class="bi bi-file-earmark-text"></i> View Activity Log
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100 mb-0">
+            <div class="card-header bg-warning text-dark">
+                <h5><i class="bi bi-slash-circle"></i> Revoked Vouchers</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">View all revoked vouchers and restore them. Revoked vouchers are excluded from the whole system.</p>
+                <a asp-action="RevokedVouchers" class="btn btn-warning w-100">
+                    <i class="bi bi-file-earmark-text"></i> View Revoked Vouchers
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Database Backup Card -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card bg-gradient">
+            <div class="card-header bg-danger text-white">
+                <h5><i class="bi bi-cloud-download"></i> Database Backup & Export</h5>
+            </div>
+            <div class="card-body text-center">
+                <p class="text-muted mb-3">Access all database backup and export options</p>
+                <a asp-action="DatabaseBackup" class="btn btn-success btn-lg">
+                    <i class="bi bi-cloud-download"></i> Go to Backup Center
+                </a>
+                <p class="text-muted small mt-3">Download all tables or individual tables with complete data</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5><i class="bi bi-clock-history"></i> Quick Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="p-3 border rounded">
+                            <h4 class="text-primary">@ViewBag.TotalVouchers</h4>
+                            <p class="mb-0">Total Vouchers</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 border rounded">
+                            <h4 class="text-success">@ViewBag.ActiveProjects</h4>
+                            <p class="mb-0">Active Projects</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 border rounded">
+                            <h4 class="text-info">@ViewBag.TotalCustomers</h4>
+                            <p class="mb-0">Total Customers</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 border rounded">
+                            <h4 class="text-warning">@ViewBag.TotalItems</h4>
+                            <p class="mb-0">Total Items</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        /* === Global Date Filter === */
+        .global-filter-card {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%);
+            border-radius: 14px;
+        }
+
+        .global-filter-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.18);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .global-filter-card .input-group {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .global-filter-card .form-control:focus {
+            box-shadow: none;
+        }
+
+        .global-filter-card .preset-btn {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            padding: 4px 14px;
+            font-size: 0.8rem;
+            transition: all 0.2s ease;
+        }
+
+        .global-filter-card .preset-btn:hover,
+        .global-filter-card .preset-btn.active {
+            background: #fff;
+            color: #1e3c72;
+            border-color: #fff;
+            font-weight: 600;
+        }
+
+        /* Report cards with sticky buttons at bottom */
+        .row-cols-lg-5 .card {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .row-cols-lg-5 .card-body {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            padding-bottom: 1rem;
+        }
+
+        .row-cols-lg-5 .card-body p {
+            flex-grow: 1;
+            margin-bottom: 1rem;
+        }
+
+        .row-cols-lg-5 .card-body form {
+            display: flex;
+            flex-direction: column;
+            margin-top: auto;
+        }
+
+        .row-cols-lg-5 .card-body .btn {
+            margin-top: auto;
+        }
+
+        .row-cols-lg-5 .card-body a.btn {
+            margin-top: auto;
+        }
+    </style>
+}
+
+@section Scripts {
+    <script>
+        // Navigate to report page with global dates
+        function navigateWithGlobalDates(reportAction) {
+            var fromDate = $('#globalFromDate').val();
+            var toDate = $('#globalToDate').val();
+            var url = '/Reports/' + reportAction + '?fromDate=' + encodeURIComponent(fromDate) + '&toDate=' + encodeURIComponent(toDate);
+            window.location.href = url;
+        }
+
+        $(document).ready(function() {
+            // Apply global dates to all report forms
+            function applyGlobalDates() {
+                var fromDate = $('#globalFromDate').val();
+                var toDate = $('#globalToDate').val();
+
+                // Apply to Profit & Loss form
+                $('.profit-loss-from-date').val(fromDate);
+                $('.profit-loss-to-date').val(toDate);
+
+                // Apply to Bank Statement form
+                $('.bank-statement-from-date').val(fromDate);
+                $('.bank-statement-to-date').val(toDate);
+
+                // Apply to Customer Ledger form
+                $('.customer-ledger-from-date').val(fromDate);
+                $('.customer-ledger-to-date').val(toDate);
+
+                // Apply to Khata Report form
+                $('.khata-from-date').val(fromDate);
+                $('.khata-to-date').val(toDate);
+
+                // Apply to Cash Flow form
+                $('.cash-flow-from-date').val(fromDate);
+                $('.cash-flow-to-date').val(toDate);
+
+                // Apply to Stock Report form
+                $('.stock-report-from-date').val(fromDate);
+                $('.stock-report-to-date').val(toDate);
+
+                // Apply to Stock Track Report form
+                $('.stock-track-report-from-date').val(fromDate);
+                $('.stock-track-report-to-date').val(toDate);
+
+                // Apply to Daily Cash Book form
+                $('.daily-cashbook-from-date').val(fromDate);
+                $('.daily-cashbook-to-date').val(toDate);
+
+                // Save to localStorage
+                localStorage.setItem('globalFromDate', fromDate);
+                localStorage.setItem('globalToDate', toDate);
+
+                // Show success message
+                var btn = $('#applyGlobalDates');
+                var originalText = btn.html();
+                btn.html('<i class="bi bi-check-circle-fill text-success"></i> Applied!');
+                setTimeout(function() {
+                    btn.html(originalText);
+                }, 2000);
+            }
+
+            // Apply button click
+            $('#applyGlobalDates').on('click', function() {
+                applyGlobalDates();
+            });
+
+            // Quick preset buttons (Today / Last 7 Days / This Month / Last 30 Days / This Year)
+            function fmt(d) {
+                var y = d.getFullYear();
+                var m = String(d.getMonth() + 1).padStart(2, '0');
+                var day = String(d.getDate()).padStart(2, '0');
+                return y + '-' + m + '-' + day;
+            }
+
+            $('.preset-btn').on('click', function() {
+                var preset = $(this).data('preset');
+                var today = new Date();
+                var from = new Date();
+                var to = new Date();
+
+                switch (preset) {
+                    case 'today':
+                        from = today; to = today;
+                        break;
+                    case 'week':
+                        from = new Date(); from.setDate(today.getDate() - 6); to = today;
+                        break;
+                    case 'month':
+                        from = new Date(today.getFullYear(), today.getMonth(), 1); to = today;
+                        break;
+                    case 'last30':
+                        from = new Date(); from.setDate(today.getDate() - 29); to = today;
+                        break;
+                    case 'year':
+                        from = new Date(today.getFullYear(), 0, 1); to = today;
+                        break;
+                }
+
+                $('#globalFromDate').val(fmt(from));
+                $('#globalToDate').val(fmt(to));
+
+                $('.preset-btn').removeClass('active');
+                $(this).addClass('active');
+
+                applyGlobalDates();
+            });
+
+            // Reset button click
+            $('#resetGlobalDates').on('click', function() {
+                var today = new Date().toISOString().split('T')[0];
+                var lastMonth = new Date();
+                lastMonth.setMonth(lastMonth.getMonth() - 1);
+                var lastMonthDate = lastMonth.toISOString().split('T')[0];
+
+                $('#globalFromDate').val(lastMonthDate);
+                $('#globalToDate').val(today);
+
+                applyGlobalDates();
+
+                localStorage.removeItem('globalFromDate');
+                localStorage.removeItem('globalToDate');
+            });
+
+            // On page load, apply saved dates
+            var savedFromDate = localStorage.getItem('globalFromDate');
+            var savedToDate = localStorage.getItem('globalToDate');
+
+            if (savedFromDate && savedToDate) {
+                $('#globalFromDate').val(savedFromDate);
+                $('#globalToDate').val(savedToDate);
+                applyGlobalDates();
+            }
+
+            // Apply dates when global date inputs change (manual change clears preset highlight)
+            $('#globalFromDate, #globalToDate').on('change', function() {
+                $('.preset-btn').removeClass('active');
+                applyGlobalDates();
+            });
+        });
+    </script>
+}
